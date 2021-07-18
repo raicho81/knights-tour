@@ -5,22 +5,33 @@ import time
 import logging
 from lru_cache import LRUCache
 
-
 logging.basicConfig(filename=__file__ + ".log",
                     filemode="a+",
                     # encoding='utf-8',
-                    format='%(asctime)s %(levelname)s %(message)s',
+                    format='[%(asctime)s] [%(levelname)s]: %(message)s',
                     level=logging.DEBUG)
 
 
 class KnightsTourAlgo:
+    """
+        Algo for finding all knights tours by brute force with some caching implemented for speeding up the
+        solutions. Also there is a non brute force version implemented, which is using Warnsdorff's rule
+        https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule
+    """
+
     def __init__(self, board_size, brute_force):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.start_time = time.time()
-        self.negative_outcome_nodes_cache = set()   # LRUCache(10000000)
+        self.negative_outcome_nodes_cache = set()  # LRUCache(10000000)
         # self.positive_outcome_nodes_cache = LRUCache(1000000)
+        self.found_paths_set = set()
+
+    def init_internal_data(self):
+        self.start_time = time.time()
+        self.found_walks_count = 0
+        self.find_possible_moves_helper.cache_clear()
 
     def negative_outcomes_cache_size(self):
         return len(self.negative_outcome_nodes_cache)
@@ -100,7 +111,7 @@ class KnightsTourAlgo:
             value |= (1 << bit)
         return value
 
-    def make_node_vicinity_context_matrix(self, path):
+    def make_node_mtx_ctx(self, path):
         node = path[-1]
         x, y = node
         widen_with = self.board_size // 2
@@ -108,12 +119,12 @@ class KnightsTourAlgo:
         # maxx = x + widen_with
         miny = y - widen_with
         maxy = y + widen_with
-        vicinity_context_matrix = 0
+        mtx_ctx = 0
 
         b = [path_node[1] * (maxy - miny + self.board_size % 2) + path_node[0] for path_node in path]
-        vicinity_context_matrix = self.set_bits(vicinity_context_matrix, b)
-        # print("{:08b}, {}".format(vicinity_context_matrix, vicinity_context_matrix))
-        return vicinity_context_matrix
+        mtx_ctx = self.set_bits(mtx_ctx, b)
+        # print("{:08b}, {}".format(mtx_ctx, mtx_ctx))
+        return mtx_ctx
 
     def check_negative_node_previous_node_pms_and_cache(self, path):
         while len(path) >= 2:
@@ -121,7 +132,7 @@ class KnightsTourAlgo:
             path = path[:-1]
             pms = self.find_possible_moves(path[-1], path)
             if not pms:
-                raise(RuntimeError("Previous node in the path doesn't have possible moves! What is wrong?!?!?!?!"))
+                raise (RuntimeError("Previous node in the path doesn't have possible moves! What is wrong?!?!?!?!"))
             if len(pms) > 1:
                 # path.append(node)
                 break
@@ -142,21 +153,54 @@ class KnightsTourAlgo:
             self.add_to_positive_outcome_nodes_cache(path, end_segment)
 
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):
-        vicinity_mtx_ctx = self.compute_vicinity_mtx_ctx(dead_end_path)
-        self.negative_outcome_nodes_cache.add(vicinity_mtx_ctx)
+        mtx_ctx = self.compute_mtx_ctx(dead_end_path)
+        self.negative_outcome_nodes_cache.add(mtx_ctx)
 
     def add_to_positive_outcome_nodes_cache(self, path, end_segment):
-        vicinity_mtx_ctx = self.compute_vicinity_mtx_ctx(path)
-        val = self.positive_outcome_nodes_cache.get(vicinity_mtx_ctx)
+        mtx_ctx = self.compute_mtx_ctx(path)
+        val = self.positive_outcome_nodes_cache.get(mtx_ctx)
         if val == -1:
-            self.positive_outcome_nodes_cache.put(vicinity_mtx_ctx, [end_segment])
+            self.positive_outcome_nodes_cache.put(mtx_ctx, [end_segment])
         else:
             val.append(end_segment)
-            self.positive_outcome_nodes_cache.put(vicinity_mtx_ctx, val)
+            self.positive_outcome_nodes_cache.put(mtx_ctx, val)
 
-    def compute_vicinity_mtx_ctx(self, path):
-        vicinity_mtx_ctx = self.make_node_vicinity_context_matrix(path)
-        return vicinity_mtx_ctx
+    def compute_mtx_ctx(self, path):
+        mtx_ctx = self.make_node_mtx_ctx(path)
+        return mtx_ctx
+
+    def check_if_path_found(self, new_path):
+        if len(new_path) == self.board_size * self.board_size:
+            self.found_walks_count += 1
+            self.found_paths_set.add(tuple(new_path))
+            # self.check_positive_node_previous_node_pms_and_cache(new_path)
+            if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
+                tt = time.time() - self.start_time
+                logging.info("Current self.negative_outcome_nodes_cache size: {}".format(
+                    len(self.negative_outcome_nodes_cache)))
+                # logging.info("Current self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
+                #     self.positive_outcome_nodes_cache.cache_hits,
+                #     self.positive_outcome_nodes_cache.cache_misses,
+                #     self.positive_outcome_nodes_cache.size()))
+
+            logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            return True
+        return False
+
+    def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms, current_dead_end_paths):
+        new_pms = self.find_possible_moves(new_path[-1], new_path)
+        if new_pms and len(new_path) > self.board_size:
+            for new_pm_node in new_pms:
+                new_path.append(new_pm_node)
+                mtx_ctx = self.compute_mtx_ctx(new_path)
+                if mtx_ctx in self.negative_outcome_nodes_cache:
+                    new_pms.remove(new_pm_node)
+                new_path.pop()
+
+        if new_pms:
+            current_new_paths_pms.append((new_path, len(new_pms), new_pms))
+        else:
+            current_dead_end_paths.append(new_path)
 
     def find_walks(self, current_path, possible_moves):
         current_new_paths_pms = []
@@ -166,41 +210,15 @@ class KnightsTourAlgo:
             new_path = current_path.copy()
             new_path.append(possible_move)
 
-            if len(new_path) == self.board_size * self.board_size:
-                self.found_walks_count += 1
-                # self.check_positive_node_previous_node_pms_and_cache(new_path)
-                if self.found_walks_count % 50 == 0:     #(3 ** self.board_size) == 0:
-                    tt = time.time() - self.start_time
-                    logging.info("Current self.negative_outcome_nodes_cache size: {}".format(
-                        len(self.negative_outcome_nodes_cache)))
-                    # logging.info("Current self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
-                    #     self.positive_outcome_nodes_cache.cache_hits,
-                    #     self.positive_outcome_nodes_cache.cache_misses,
-                    #     self.positive_outcome_nodes_cache.size()))
-
-                logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            if self.check_if_path_found(new_path):
                 continue
 
-            new_pms = self.find_possible_moves(new_path[-1], new_path)
-            if new_pms and len(new_path) > self.board_size:
-                for new_pm_node in new_pms:
-                    new_path.append(new_pm_node)
-                    v_mtx_ctx = self.compute_vicinity_mtx_ctx(new_path)
-                    if v_mtx_ctx in self.negative_outcome_nodes_cache:
-                        new_pms.remove(new_pm_node)
-                    new_path.pop()
+            self.find_new_pms_and_dead_ends(new_path, current_new_paths_pms, current_dead_end_paths)
 
-                if not new_pms:
-                    continue
-
-            if new_pms:
-                current_new_paths_pms.append((new_path, len(new_pms), new_pms))
-            else:
-                current_dead_end_paths.append(new_path)
+        for p in current_dead_end_paths:
+            self.check_negative_node_previous_node_pms_and_cache(p)
 
         if not current_new_paths_pms:
-            for p in current_dead_end_paths:
-                self.check_negative_node_previous_node_pms_and_cache(p)
             return
 
         if not self.brute_force:
@@ -227,12 +245,12 @@ class KnightsTourAlgo:
         #     self.positive_outcome_nodes_cache.cache_misses,
         #     self.positive_outcome_nodes_cache.size()))
 
-
     def run(self):
         logging.info("*** ALGO PARAMETERS START ***")
         logging.info("Board size: {}x{}".format(self.board_size, self.board_size))
         logging.info("Brute force: {}".format(self.brute_force))
         logging.info("*** ALGO PARAMETERS END ***")
+        logging.info("*** ALGO UNIQUE PATHS FOUND {} ***".format(len(self.found_paths_set)))
         logging.info("Clearing Cache")
         self.find_possible_moves_helper.cache_clear()
         # self.set_bit.cache_clear()
@@ -264,9 +282,11 @@ class KnightsTourAlgo:
 
 if __name__ == '__main__':
     runtimes = []
-    for _ in range(10):
+
+    for _ in range(5):
         kta = KnightsTourAlgo(5, True)
         runtimes.append(kta.run())
+        # kta.init_internal_data()
 
     logging.info("Avg. runtime after #{} runs is: {}s, STDDEV is: {:.3}s".format(len(runtimes),
                                                                                  kta.seconds_to_str(
