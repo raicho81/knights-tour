@@ -295,8 +295,6 @@ def main():
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
 
-    s_rts = sum(runtimes)
-    s_n_paths = sum(runtimes_per_path)
     logging.info("Avg. runtime after #{} runs is: {}, avg. runtime per path is: {}. "
                  "Negative outcomes cache size is: {} bytes".format(
                                                                     len(runtimes),
