@@ -4,7 +4,7 @@ import statistics
 from string import ascii_lowercase as ascii_lc
 import time
 import logging
-import lru_cache
+
 
 logging.basicConfig(filename=__file__ + ".log",
                     filemode="a+",
@@ -20,13 +20,16 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule
     """
 
-    def __init__(self, board_size, brute_force):
+    def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
         self.path_start_time = None
         self.negative_outcome_nodes_cache = set()  # LRUCache(10000000)
+        self.generated_paths_set = set()
+        self.run_time_checks = run_time_checks
+        self.min_negative_path_len = min_negative_path_len
         # self.positive_outcome_nodes_cache = LRUCache(1000000)
 
     def init_internal_data(self):
@@ -127,7 +130,7 @@ class KnightsTourAlgo:
         return mtx_ctx
 
     def check_negative_node_previous_node_pms_and_cache(self, path):
-        while len(path) >= 3:
+        while len(path) >= self.min_negative_path_len:
             node = path[-1]
             path = path[:-1]
             pms = self.find_possible_moves(path[-1], path)
@@ -180,10 +183,19 @@ class KnightsTourAlgo:
                 raise RuntimeError("Incorrect path! path: {}, node: {}, pms: {}, next_node: {}"
                                    .format(path), pms, next_node)
             node = next_node
+        if tuple(path) in self.generated_paths_set:
+            raise RuntimeError("Path is already generated! WTF?!?!?!?! path: {}, node: {}, pms: {}, next_node: {}"
+                               .format(path), pms, next_node)
+        self.generated_paths_set.add(tuple(path))
 
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
-            self.check_path(new_path)
+            if self.run_time_checks:
+                try:
+                    self.check_path(new_path)
+                except RuntimeError as rte:
+                    logging.error(rte)
+
             self.found_walks_count += 1
             # self.check_positive_node_previous_node_pms_and_cache(new_path)
             if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
@@ -203,12 +215,15 @@ class KnightsTourAlgo:
 
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms, current_dead_end_paths):
         new_pms = self.find_possible_moves(new_path[-1], new_path)
-        if new_pms and len(new_path) > self.board_size:
+
+        if new_pms and len(new_path) >= self.min_negative_path_len:
             for new_pm_node in new_pms:
                 new_path.append(new_pm_node)
                 mtx_ctx = self.compute_mtx_ctx(new_path)
+
                 if mtx_ctx in self.negative_outcome_nodes_cache:
                     new_pms.remove(new_pm_node)
+
                 new_path.pop()
 
         if new_pms:
@@ -300,8 +315,8 @@ def main():
     runtimes = []
     runtimes_per_path = []
 
-    for _ in range(2):
-        kta = KnightsTourAlgo(5, True)
+    for _ in range(10):
+        kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
