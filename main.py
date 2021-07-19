@@ -4,6 +4,7 @@ import statistics
 from string import ascii_lowercase as ascii_lc
 import time
 import logging
+import cachetools
 
 
 logging.basicConfig(filename=__file__ + ".log",
@@ -20,13 +21,13 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule
     """
 
-    def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2):
+    def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2, negative_outcome_nodes_cache_size=2048*1024*1024):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
         self.path_start_time = None
-        self.negative_outcome_nodes_cache = set()  # LRUCache(10000000)
+        self.negative_outcome_nodes_cache = cachetools.LRUCache(maxsize=negative_outcome_nodes_cache_size, getsizeof=sys.getsizeof)    # set()  # LRUCache(10000000)
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -38,7 +39,7 @@ class KnightsTourAlgo:
         self.find_possible_moves_helper.cache_clear()
 
     def negative_outcomes_cache_size(self):
-        return len(self.negative_outcome_nodes_cache)
+        return self.negative_outcome_nodes_cache.currsize
 
     @staticmethod
     def seconds_to_str(t):
@@ -100,15 +101,14 @@ class KnightsTourAlgo:
     @staticmethod
     def make_walk_path_string(walk):
         node = walk[0]
-        walk_line = "b{}{}".format(ascii_lc[node[0]], node[1] + 1)
+        walk_string = "b{}{}".format(ascii_lc[node[0]], node[1] + 1)
         for node in walk[1:]:
-            walk_line = "{}{}{}".format(walk_line, ascii_lc[node[0]], node[1] + 1)
-        return walk_line
+            walk_string = "{}{}{}".format(walk_string, ascii_lc[node[0]], node[1] + 1)
+        return walk_string
 
     def clear_bit(self, value, bit):
         return value & ~(1 << bit)
 
-    # @functools.lru_cache(1000*20)
     def set_bits(self, value, bits):
         for bit in bits:
             value |= (1 << bit)
@@ -158,7 +158,12 @@ class KnightsTourAlgo:
 
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):
         mtx_ctx = self.compute_mtx_ctx(dead_end_path)
-        self.negative_outcome_nodes_cache.add(mtx_ctx)
+        mtx_ctx_count = self.negative_outcome_nodes_cache.get(mtx_ctx)
+        if mtx_ctx_count:
+            mtx_ctx_count += 1
+            self.negative_outcome_nodes_cache[mtx_ctx] = mtx_ctx_count
+        else:
+            self.negative_outcome_nodes_cache[mtx_ctx] = 1
 
     def add_to_positive_outcome_nodes_cache(self, path, end_segment):
         mtx_ctx = self.compute_mtx_ctx(path)
@@ -200,10 +205,9 @@ class KnightsTourAlgo:
             # self.check_positive_node_previous_node_pms_and_cache(new_path)
             if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
                 tt = time.time() - self.algo_start_time
-                logging.info("Current self.negative_outcome_nodes_cache size: {}, size in bytes: {}".format(
+                logging.info("Current self.negative_outcome_nodes_cache size: {}, size in bytes {}".format(
                     len(self.negative_outcome_nodes_cache),
-                    sys.getsizeof(self.negative_outcome_nodes_cache))
-                )
+                    self.negative_outcome_nodes_cache.currsize))
                 # logging.info("Current self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
                 #     self.positive_outcome_nodes_cache.cache_hits,
                 #     self.positive_outcome_nodes_cache.cache_misses,
@@ -267,8 +271,9 @@ class KnightsTourAlgo:
         logging.info("Total # of possible walks found: {}".format(self.found_walks_count))
         logging.info(
             "self.find_possible_moves_helper Cache Info: {}".format(self.find_possible_moves_helper.cache_info()))
-        logging.info("Final self.negative_outcome_nodes_cache size: {}".format(
-            len(self.negative_outcome_nodes_cache)))
+        logging.info("Final self.negative_outcome_nodes_cache size: {}, size in bytes: {}".format(
+            len(self.negative_outcome_nodes_cache),
+            self.negative_outcome_nodes_cache.currsize))
         # logging.info("Final self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
         #     self.positive_outcome_nodes_cache.cache_hits,
         #     self.positive_outcome_nodes_cache.cache_misses,
