@@ -127,7 +127,7 @@ class KnightsTourAlgo:
         return mtx_ctx
 
     def check_negative_node_previous_node_pms_and_cache(self, path):
-        while len(path) >= 2:
+        while len(path) >= 3:
             node = path[-1]
             path = path[:-1]
             pms = self.find_possible_moves(path[-1], path)
@@ -136,7 +136,6 @@ class KnightsTourAlgo:
                 raise (RuntimeError(f"Previous node in the path doesn't have possible moves! What is wrong?!?!?!?! Path:"
                                     f"{path}"))
             if len(pms) > 1:
-                # path.append(node)
                 break
             self.add_to_negative_outcome_nodes_cache(path)
         self.add_to_negative_outcome_nodes_cache(path)
@@ -171,8 +170,20 @@ class KnightsTourAlgo:
         mtx_ctx = self.make_node_mtx_ctx(path)
         return mtx_ctx
 
+    def check_path(self, path):
+        node = path[0]
+        pms = self.find_possible_moves(node, path[0:1])
+        for next_node_idx in range(1, len(path)):
+            next_node = path[next_node_idx]
+            pms = self.find_possible_moves(node, path[0:next_node_idx])
+            if next_node not in pms:
+                raise RuntimeError("Incorrect path! path: {}, node: {}, pms: {}, next_node: {}"
+                                   .format(path), pms, next_node)
+            node = next_node
+
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
+            self.check_path(new_path)
             self.found_walks_count += 1
             # self.check_positive_node_previous_node_pms_and_cache(new_path)
             if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
