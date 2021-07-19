@@ -1,9 +1,10 @@
 import functools
+import sys
 import statistics
 from string import ascii_lowercase as ascii_lc
 import time
 import logging
-from lru_cache import LRUCache
+import lru_cache
 
 logging.basicConfig(filename=__file__ + ".log",
                     filemode="a+",
@@ -23,19 +24,18 @@ class KnightsTourAlgo:
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
-        self.start_time = time.time()
+        self.algo_start_time = time.time()
+        self.path_start_time = None
         self.negative_outcome_nodes_cache = set()  # LRUCache(10000000)
         # self.positive_outcome_nodes_cache = LRUCache(1000000)
-        self.found_paths_set = set()
 
     def init_internal_data(self):
-        self.start_time = time.time()
+        self.algo_start_time = time.time()
         self.found_walks_count = 0
         self.find_possible_moves_helper.cache_clear()
 
     def negative_outcomes_cache_size(self):
         return len(self.negative_outcome_nodes_cache)
-        # return self.negative_outcome_nodes_cache.size()
 
     @staticmethod
     def seconds_to_str(t):
@@ -132,7 +132,9 @@ class KnightsTourAlgo:
             path = path[:-1]
             pms = self.find_possible_moves(path[-1], path)
             if not pms:
-                raise (RuntimeError("Previous node in the path doesn't have possible moves! What is wrong?!?!?!?!"))
+                path.append(node)
+                raise (RuntimeError(f"Previous node in the path doesn't have possible moves! What is wrong?!?!?!?! Path:"
+                                    f"{path}"))
             if len(pms) > 1:
                 # path.append(node)
                 break
@@ -172,12 +174,13 @@ class KnightsTourAlgo:
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
             self.found_walks_count += 1
-            self.found_paths_set.add(tuple(new_path))
             # self.check_positive_node_previous_node_pms_and_cache(new_path)
             if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
-                tt = time.time() - self.start_time
-                logging.info("Current self.negative_outcome_nodes_cache size: {}".format(
-                    len(self.negative_outcome_nodes_cache)))
+                tt = time.time() - self.algo_start_time
+                logging.info("Current self.negative_outcome_nodes_cache size: {}, size in bytes: {}".format(
+                    len(self.negative_outcome_nodes_cache),
+                    sys.getsizeof(self.negative_outcome_nodes_cache))
+                )
                 # logging.info("Current self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
                 #     self.positive_outcome_nodes_cache.cache_hits,
                 #     self.positive_outcome_nodes_cache.cache_misses,
@@ -245,15 +248,7 @@ class KnightsTourAlgo:
         #     self.positive_outcome_nodes_cache.cache_misses,
         #     self.positive_outcome_nodes_cache.size()))
 
-    def run(self):
-        logging.info("*** ALGO PARAMETERS START ***")
-        logging.info("Board size: {}x{}".format(self.board_size, self.board_size))
-        logging.info("Brute force: {}".format(self.brute_force))
-        logging.info("*** ALGO PARAMETERS END ***")
-        logging.info("*** ALGO UNIQUE PATHS FOUND {} ***".format(len(self.found_paths_set)))
-        logging.info("Clearing Cache")
-        self.find_possible_moves_helper.cache_clear()
-        # self.set_bit.cache_clear()
+    def bootstrap_search(self):
         possible_moves = []
 
         for x_coord in range(self.board_size):
@@ -273,22 +268,42 @@ class KnightsTourAlgo:
                 break
             self.find_walks(pm[0], pm[2])
 
-        tt = time.time() - self.start_time
+    def run(self):
+        logging.info("*** ALGO PARAMETERS START ***")
+        logging.info("Board size: {}x{}".format(self.board_size, self.board_size))
+        logging.info("Brute force: {}".format(self.brute_force))
+        logging.info("*** ALGO PARAMETERS END ***")
+        logging.info("Clearing Cache")
+        self.find_possible_moves_helper.cache_clear()
+        # self.set_bit.cache_clear()
+        self.bootstrap_search()
+
+        tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
         logging.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
         logging.info("*** ALGO END ***".format())
-        return tt
+        return tt, tt / self.found_walks_count
+
+
+def main():
+    runtimes = []
+    runtimes_per_path = []
+
+    for _ in range(2):
+        kta = KnightsTourAlgo(5, True)
+        rt, rt_path = kta.run()
+        runtimes.append(rt)
+        runtimes_per_path.append(rt_path)
+
+    s_rts = sum(runtimes)
+    s_n_paths = sum(runtimes_per_path)
+    logging.info("Avg. runtime after #{} runs is: {}, avg. runtime per path is: {}. "
+                 "Negative outcomes cache size is: {} bytes".format(
+                                                                    len(runtimes),
+                                                                    kta.seconds_to_str(statistics.mean(runtimes)),
+                                                                    statistics.mean(runtimes_per_path),
+                                                                    sys.getsizeof(kta.negative_outcome_nodes_cache)))
 
 
 if __name__ == '__main__':
-    runtimes = []
-
-    for _ in range(5):
-        kta = KnightsTourAlgo(5, True)
-        runtimes.append(kta.run())
-        # kta.init_internal_data()
-
-    logging.info("Avg. runtime after #{} runs is: {}s, STDDEV is: {:.3}s".format(len(runtimes),
-                                                                                 kta.seconds_to_str(
-                                                                                     statistics.mean(runtimes)),
-                                                                                 statistics.stdev(runtimes)))
+    main()
