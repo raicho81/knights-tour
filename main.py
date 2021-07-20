@@ -5,6 +5,7 @@ from string import ascii_lowercase as ascii_lc
 import time
 import logging
 import cachetools
+import functools
 
 
 logging.basicConfig(filename=__file__ + ".log",
@@ -21,13 +22,15 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule
     """
 
-    def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2, negative_outcome_nodes_cache_size=2048*1024*1024):
+    def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2,
+                 negative_outcome_nodes_max_cache_size_bytes=1024 * 1024 * 1024):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
-        self.path_start_time = None
-        self.negative_outcome_nodes_cache = cachetools.LRUCache(maxsize=negative_outcome_nodes_cache_size, getsizeof=sys.getsizeof)    # set()  # LRUCache(10000000)
+        self.negative_outcome_nodes_max_cache_size_bytes = negative_outcome_nodes_max_cache_size_bytes
+        self.negative_outcome_nodes_cache = cachetools.LRUCache(maxsize=self.negative_outcome_nodes_max_cache_size_bytes,
+                                                                getsizeof=sys.getsizeof)
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -115,16 +118,8 @@ class KnightsTourAlgo:
         return value
 
     def make_node_mtx_ctx(self, path):
-        node = path[-1]
-        x, y = node
-        widen_with = self.board_size // 2
-        # minx = x - widen_with
-        # maxx = x + widen_with
-        miny = y - widen_with
-        maxy = y + widen_with
         mtx_ctx = 0
-
-        b = [path_node[1] * (maxy - miny + self.board_size % 2) + path_node[0] for path_node in path]
+        b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
         mtx_ctx = self.set_bits(mtx_ctx, b)
         # print("{:08b}, {}".format(mtx_ctx, mtx_ctx))
         return mtx_ctx
@@ -166,6 +161,7 @@ class KnightsTourAlgo:
             self.negative_outcome_nodes_cache[mtx_ctx] = 1
 
     def add_to_positive_outcome_nodes_cache(self, path, end_segment):
+        logging.debug("add_to_positive_outcome_nodes_cache -> path: {}".format(path))
         mtx_ctx = self.compute_mtx_ctx(path)
         val = self.positive_outcome_nodes_cache.get(mtx_ctx)
         if val == -1:
@@ -217,9 +213,11 @@ class KnightsTourAlgo:
             return True
         return False
 
-    def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms, current_dead_end_paths):
+    def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
         new_pms = self.find_possible_moves(new_path[-1], new_path)
+        to_filter = []
 
+        # Filter negative outcome paths
         if new_pms and len(new_path) >= self.min_negative_path_len:
             for new_pm_node in new_pms:
                 new_path.append(new_pm_node)
@@ -231,41 +229,40 @@ class KnightsTourAlgo:
                 new_path.pop()
 
         if new_pms:
-            current_new_paths_pms.append((new_path, len(new_pms), new_pms))
+            current_new_paths_pms.append((new_path[-1], new_pms))
         else:
-            current_dead_end_paths.append(new_path)
+            self.check_negative_node_previous_node_pms_and_cache(new_path)
 
     def find_walks(self, current_path, possible_moves):
         current_new_paths_pms = []
         current_dead_end_paths = []
 
         for possible_move in possible_moves:
-            new_path = current_path.copy()
-            new_path.append(possible_move)
+            current_path.append(possible_move)
 
-            if self.check_if_path_found(new_path):
+            if self.check_if_path_found(current_path):
+                current_path.pop()
                 continue
 
-            self.find_new_pms_and_dead_ends(new_path, current_new_paths_pms, current_dead_end_paths)
-
-        for p in current_dead_end_paths:
-            self.check_negative_node_previous_node_pms_and_cache(p)
+            self.find_new_pms_and_dead_ends(current_path, current_new_paths_pms)
+            current_path.pop()
 
         if not current_new_paths_pms:
             return
 
         if not self.brute_force:
-            current_new_paths_pms = sorted(current_new_paths_pms, key=lambda x: x[1])
+            current_new_paths_pms = sorted(current_new_paths_pms, key=lambda x: len(x[1]))
             if current_new_paths_pms:
-                cur_min_pms_len = current_new_paths_pms[0][1]
+                cur_min_pms_len = len(current_new_paths_pms[0][1])
 
-        for path_possible_moves in current_new_paths_pms:
+        for new_path_possible_moves in current_new_paths_pms:
             # Skip nodes with more possible outcomes than the first node in the sorted list
-            if not self.brute_force and path_possible_moves[1] > cur_min_pms_len:
+            if not self.brute_force and len(new_path_possible_moves[1]) > cur_min_pms_len:
                 break
 
-            new_path = path_possible_moves[0]
-            self.find_walks(new_path, path_possible_moves[2])
+            current_path.append(new_path_possible_moves[0])
+            self.find_walks(current_path, new_path_possible_moves[1])
+            current_path.pop()
 
     def print_all_walks_info(self):
         logging.info("Total # of possible walks found: {}".format(self.found_walks_count))
@@ -287,25 +284,29 @@ class KnightsTourAlgo:
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_node, start_path)
-                possible_moves.append((start_path, len(pms), pms))
+                possible_moves.append((start_node, pms))
 
         if not self.brute_force:
-            possible_moves = sorted(possible_moves, key=lambda x: x[1])
+            possible_moves = sorted(possible_moves, key=lambda x: len(x[1]))
             if possible_moves:
-                possible_move_min_len = possible_moves[0][1]
+                possible_move_min_len = len(possible_moves[0][1])
 
         for pm in possible_moves:
-            if not self.brute_force and pm[1] > possible_move_min_len:
+            if not self.brute_force and len(possible_moves[0][1]) > possible_move_min_len:
                 break
-            self.find_walks(pm[0], pm[2])
+
+            self.find_walks([pm[0]], pm[1])
 
     def run(self):
         logging.info("*** ALGO PARAMETERS START ***")
         logging.info("Board size: {}x{}".format(self.board_size, self.board_size))
         logging.info("Brute force: {}".format(self.brute_force))
+        logging.info("Run time checks: {}".format(self.run_time_checks))
+        logging.info("Min negative path len: {}".format(self.min_negative_path_len))
+        logging.info("Negative outcome nodes max cache size bytes: {}".format(self.negative_outcome_nodes_max_cache_size_bytes))
         logging.info("*** ALGO PARAMETERS END ***")
         logging.info("Clearing Cache")
-        self.find_possible_moves_helper.cache_clear()
+        # self.find_possible_moves_helper.cache_clear()
         # self.set_bit.cache_clear()
         self.bootstrap_search()
 
@@ -320,18 +321,17 @@ def main():
     runtimes = []
     runtimes_per_path = []
 
-    for _ in range(10):
-        kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2)
+    for _ in range(5):
+        kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2,
+                              negative_outcome_nodes_max_cache_size_bytes=1048 * 1024 * 1024)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
 
     logging.info("Avg. runtime after #{} runs is: {}, avg. runtime per path is: {}. "
-                 "Negative outcomes cache size is: {} bytes".format(
-                                                                    len(runtimes),
-                                                                    kta.seconds_to_str(statistics.mean(runtimes)),
-                                                                    statistics.mean(runtimes_per_path),
-                                                                    sys.getsizeof(kta.negative_outcome_nodes_cache)))
+                 .format(len(runtimes),
+                         kta.seconds_to_str(statistics.mean(runtimes)),
+                         statistics.mean(runtimes_per_path)))
 
 
 if __name__ == '__main__':
