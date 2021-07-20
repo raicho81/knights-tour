@@ -29,8 +29,7 @@ class KnightsTourAlgo:
         self.brute_force = brute_force
         self.algo_start_time = time.time()
         self.negative_outcome_nodes_max_cache_size_bytes = negative_outcome_nodes_max_cache_size_bytes
-        self.negative_outcome_nodes_cache = cachetools.LRUCache(maxsize=self.negative_outcome_nodes_max_cache_size_bytes,
-                                                                getsizeof=sys.getsizeof)
+        self.negative_outcome_nodes_cache = cachetools.LRUCache(maxsize=self.negative_outcome_nodes_max_cache_size_bytes)
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -321,9 +320,9 @@ def main():
     runtimes = []
     runtimes_per_path = []
 
-    for _ in range(5):
-        kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2,
-                              negative_outcome_nodes_max_cache_size_bytes=1048 * 1024 * 1024)
+    for _ in range(2):
+        kta = KnightsTourAlgo(6, brute_force=True, run_time_checks=False, min_negative_path_len=2,
+                              negative_outcome_nodes_max_cache_size_bytes=5 * 1000 * 1000)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
