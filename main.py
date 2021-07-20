@@ -23,13 +23,14 @@ class KnightsTourAlgo:
     """
 
     def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2,
-                 negative_outcome_nodes_max_cache_size_bytes=1024 * 1024 * 1024):
+                 negative_outcome_nodes_max_cache_size_bytes=10 * 1000 * 1000):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
         self.negative_outcome_nodes_max_cache_size_bytes = negative_outcome_nodes_max_cache_size_bytes
-        self.negative_outcome_nodes_cache = cachetools.LRUCache(maxsize=self.negative_outcome_nodes_max_cache_size_bytes)
+        self.negative_outcome_nodes_cache = cachetools.LRUCache(
+            maxsize=self.negative_outcome_nodes_max_cache_size_bytes)
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -200,8 +201,7 @@ class KnightsTourAlgo:
             # self.check_positive_node_previous_node_pms_and_cache(new_path)
             if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
                 tt = time.time() - self.algo_start_time
-                logging.info("Current self.negative_outcome_nodes_cache size: {}, size in bytes {}".format(
-                    len(self.negative_outcome_nodes_cache),
+                logging.info("Current self.negative_outcome_nodes_cache size: {}".format(
                     self.negative_outcome_nodes_cache.currsize))
                 # logging.info("Current self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
                 #     self.positive_outcome_nodes_cache.cache_hits,
@@ -267,8 +267,7 @@ class KnightsTourAlgo:
         logging.info("Total # of possible walks found: {}".format(self.found_walks_count))
         logging.info(
             "self.find_possible_moves_helper Cache Info: {}".format(self.find_possible_moves_helper.cache_info()))
-        logging.info("Final self.negative_outcome_nodes_cache size: {}, size in bytes: {}".format(
-            len(self.negative_outcome_nodes_cache),
+        logging.info("Final self.negative_outcome_nodes_cache size: {}".format(
             self.negative_outcome_nodes_cache.currsize))
         # logging.info("Final self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
         #     self.positive_outcome_nodes_cache.cache_hits,
@@ -302,7 +301,7 @@ class KnightsTourAlgo:
         logging.info("Brute force: {}".format(self.brute_force))
         logging.info("Run time checks: {}".format(self.run_time_checks))
         logging.info("Min negative path len: {}".format(self.min_negative_path_len))
-        logging.info("Negative outcome nodes max cache size bytes: {}".format(self.negative_outcome_nodes_max_cache_size_bytes))
+        logging.info("Negative outcome nodes max cache size: {}".format(self.negative_outcome_nodes_max_cache_size_bytes))
         logging.info("*** ALGO PARAMETERS END ***")
         logging.info("Clearing Cache")
         # self.find_possible_moves_helper.cache_clear()
@@ -320,9 +319,9 @@ def main():
     runtimes = []
     runtimes_per_path = []
 
-    for _ in range(2):
-        kta = KnightsTourAlgo(6, brute_force=True, run_time_checks=False, min_negative_path_len=2,
-                              negative_outcome_nodes_max_cache_size_bytes=5 * 1000 * 1000)
+    for _ in range(5):
+        kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2,
+                              negative_outcome_nodes_max_cache_size_bytes=10 * 1000 * 1000)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
