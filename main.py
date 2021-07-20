@@ -214,7 +214,7 @@ class KnightsTourAlgo:
 
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
         new_pms = self.find_possible_moves(new_path[-1], new_path)
-        to_filter = []
+        # to_filter = []
 
         # Filter negative outcome paths
         if new_pms and len(new_path) >= self.min_negative_path_len:
@@ -223,9 +223,13 @@ class KnightsTourAlgo:
                 mtx_ctx = self.compute_mtx_ctx(new_path)
 
                 if mtx_ctx in self.negative_outcome_nodes_cache:
+                    # to_filter.append(new_pm_node)
                     new_pms.remove(new_pm_node)
 
                 new_path.pop()
+
+        # for node in to_filter:
+        #     new_pms.remove(node)
 
         if new_pms:
             current_new_paths_pms.append((new_path[-1], new_pms))
@@ -304,7 +308,7 @@ class KnightsTourAlgo:
         logging.info("Negative outcome nodes max cache size: {}".format(self.negative_outcome_nodes_max_cache_size_bytes))
         logging.info("*** ALGO PARAMETERS END ***")
         logging.info("Clearing Cache")
-        # self.find_possible_moves_helper.cache_clear()
+        self.find_possible_moves_helper.cache_clear()
         # self.set_bit.cache_clear()
         self.bootstrap_search()
 
