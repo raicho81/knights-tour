@@ -1,4 +1,3 @@
-import statistics
 from string import ascii_lowercase as ascii_lc
 import time
 import logging
@@ -19,18 +18,21 @@ class KnightsTourAlgo:
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
-        self.negative_outcome_nodes_max_cache_size_bytes = negative_outcome_nodes_max_cache_size_bytes
+        self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache_size_bytes
         self.negative_outcome_nodes_cache = cachetools.FIFOCache(
-            maxsize=self.negative_outcome_nodes_max_cache_size_bytes)
+            maxsize=self.negative_outcome_nodes_max_cache_size)
+        self.negative_outcome_nodes_cache_hits = 0
+        self.negative_outcome_nodes_cache_misses = 0
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
-        # self.positive_outcome_nodes_cache = LRUCache(1000000)
 
     def init_internal_data(self):
         self.algo_start_time = time.time()
         self.found_walks_count = 0
-        self.find_possible_moves_helper.cache_clear()
+        self.negative_outcome_nodes_cache.clear()
+        self.negative_outcome_nodes_cache_hits = 0
+        self.negative_outcome_nodes_cache_misses = 0
 
     def negative_outcomes_cache_size(self):
         return self.negative_outcome_nodes_cache.currsize
@@ -47,7 +49,7 @@ class KnightsTourAlgo:
         res = [_ for _ in moves if _ not in current_path_set]
         return res
 
-    @functools.cache
+    @cachetools.cached(cachetools.LRUCache(maxsize=1024))
     def find_possible_moves_helper(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.
@@ -122,62 +124,46 @@ class KnightsTourAlgo:
             pms = self.find_possible_moves(path[-1], path)
             if not pms:
                 path.append(node)
-                raise (RuntimeError(f"Previous node in the path doesn't have possible moves! What is wrong?!?!?!?! Path:"
-                                    f"{path}"))
+                raise RuntimeError("Previous node in the path doesn't have possible moves! path: {}".format(path))
+
             if len(pms) > 1:
                 break
             self.add_to_negative_outcome_nodes_cache(path)
         self.add_to_negative_outcome_nodes_cache(path)
 
-    def check_positive_node_previous_node_pms_and_cache(self, path):
-        end_segment = []
-
-        while len(path) >= 2:
-            end_segment.append(path[-1])
-            path = path[:-1]
-            pms = self.find_possible_moves(end_segment[-1], path)
-            if len(pms) > 1:
-                break
-
-        if len(end_segment) > 0:
-            self.add_to_positive_outcome_nodes_cache(path, end_segment)
-
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):
         mtx_ctx = self.compute_mtx_ctx(dead_end_path)
         mtx_ctx_count = self.negative_outcome_nodes_cache.get(mtx_ctx)
         if mtx_ctx_count:
+            self.negative_outcome_nodes_cache_hits += 1
             mtx_ctx_count += 1
             self.negative_outcome_nodes_cache[mtx_ctx] = mtx_ctx_count
         else:
+            self.negative_outcome_nodes_cache_misses += 1
             self.negative_outcome_nodes_cache[mtx_ctx] = 1
-
-    def add_to_positive_outcome_nodes_cache(self, path, end_segment):
-        logging.debug("add_to_positive_outcome_nodes_cache -> path: {}".format(path))
-        mtx_ctx = self.compute_mtx_ctx(path)
-        val = self.positive_outcome_nodes_cache.get(mtx_ctx)
-        if val == -1:
-            self.positive_outcome_nodes_cache.put(mtx_ctx, [end_segment])
-        else:
-            val.append(end_segment)
-            self.positive_outcome_nodes_cache.put(mtx_ctx, val)
 
     def compute_mtx_ctx(self, path):
         mtx_ctx = self.make_node_mtx_ctx(path)
         return mtx_ctx
 
     def check_path(self, path):
+        if len(path) != self.board_size ** 2:
+            raise RuntimeError("Invalid path length: {},  path: {}. Must be: {}".format(len(path),
+                                                                                        path,
+                                                                                        self.board_size ** 2))
         node = path[0]
         pms = self.find_possible_moves(node, path[0:1])
         for next_node_idx in range(1, len(path)):
             next_node = path[next_node_idx]
             pms = self.find_possible_moves(node, path[0:next_node_idx])
             if next_node not in pms:
-                raise RuntimeError("Incorrect path! path: {}, node: {}, pms: {}, next_node: {}"
-                                   .format(path), pms, next_node)
+                raise RuntimeError(
+                    "Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}"
+                    .format(path, node, pms, next_node))
             node = next_node
         if tuple(path) in self.generated_paths_set:
-            raise RuntimeError("Path is already generated! WTF?!?!?!?! path: {}, node: {}, pms: {}, next_node: {}"
-                               .format(path), pms, next_node)
+            raise RuntimeError("Path is already generated! path: {}, node: {}, pms: {}, next_node: {}"
+                               .format(path, node, pms, next_node))
         self.generated_paths_set.add(tuple(path))
 
     def check_if_path_found(self, new_path):
@@ -185,22 +171,25 @@ class KnightsTourAlgo:
             if self.run_time_checks:
                 try:
                     self.check_path(new_path)
+                    self.found_walks_count += 1
                 except RuntimeError as rte:
                     logging.error(rte)
+            else:
+                self.found_walks_count += 1
 
-            self.found_walks_count += 1
-            # self.check_positive_node_previous_node_pms_and_cache(new_path)
-            if self.found_walks_count % 50 == 0:  # (3 ** self.board_size) == 0:
+            if self.found_walks_count % 50 == 0:
                 tt = time.time() - self.algo_start_time
                 logging.info("Current self.negative_outcome_nodes_cache size: {}".format(
                     self.negative_outcome_nodes_cache.currsize))
-                # logging.info("Current self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
-                #     self.positive_outcome_nodes_cache.cache_hits,
-                #     self.positive_outcome_nodes_cache.cache_misses,
-                #     self.positive_outcome_nodes_cache.size()))
+                logging.info("Current self.negative_outcome_nodes_cache_hits: {}".format(
+                    self.negative_outcome_nodes_cache_hits))
+                logging.info("Current self.negative_outcome_nodes_cache_misses: {}".format(
+                    self.negative_outcome_nodes_cache_misses))
 
             logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+
             return True
+
         return False
 
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
@@ -215,7 +204,10 @@ class KnightsTourAlgo:
 
                 if mtx_ctx in self.negative_outcome_nodes_cache:
                     # to_filter.append(new_pm_node)
+                    self.negative_outcome_nodes_cache_hits += 1
                     new_pms.remove(new_pm_node)
+                else:
+                    self.negative_outcome_nodes_cache_misses += 1
 
                 new_path.pop()
 
@@ -229,7 +221,6 @@ class KnightsTourAlgo:
 
     def find_walks(self, current_path, possible_moves):
         current_new_paths_pms = []
-        current_dead_end_paths = []
 
         for possible_move in possible_moves:
             current_path.append(possible_move)
@@ -261,13 +252,13 @@ class KnightsTourAlgo:
     def print_all_walks_info(self):
         logging.info("Total # of possible walks found: {}".format(self.found_walks_count))
         logging.info(
-            "self.find_possible_moves_helper Cache Info: {}".format(self.find_possible_moves_helper.cache_info()))
+            "self.find_possible_moves_helper : {}".format(self.find_possible_moves_helper))
         logging.info("Final self.negative_outcome_nodes_cache size: {}".format(
             self.negative_outcome_nodes_cache.currsize))
-        # logging.info("Final self.positive_outcome_nodes_cache hits: {}, misses: {}, size: {}".format(
-        #     self.positive_outcome_nodes_cache.cache_hits,
-        #     self.positive_outcome_nodes_cache.cache_misses,
-        #     self.positive_outcome_nodes_cache.size()))
+        logging.info("Final self.negative_outcome_nodes_cache_hits: {}".format(
+            self.negative_outcome_nodes_cache_hits))
+        logging.info("Final self.negative_outcome_nodes_cache_misses: {}".format(
+            self.negative_outcome_nodes_cache_misses))
 
     def bootstrap_search(self):
         possible_moves = []
@@ -296,11 +287,10 @@ class KnightsTourAlgo:
         logging.info("Brute force: {}".format(self.brute_force))
         logging.info("Run time checks: {}".format(self.run_time_checks))
         logging.info("Min negative path len: {}".format(self.min_negative_path_len))
-        logging.info("Negative outcome nodes max cache size: {}".format(self.negative_outcome_nodes_max_cache_size_bytes))
+        logging.info("Negative outcome nodes max cache size: {}".format(self.negative_outcome_nodes_max_cache_size))
         logging.info("*** ALGO PARAMETERS END ***")
         logging.info("Clearing Cache")
-        self.find_possible_moves_helper.cache_clear()
-        # self.set_bit.cache_clear()
+
         self.bootstrap_search()
 
         tt = time.time() - self.algo_start_time
