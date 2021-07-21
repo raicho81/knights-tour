@@ -29,7 +29,7 @@ class KnightsTourAlgo:
         self.brute_force = brute_force
         self.algo_start_time = time.time()
         self.negative_outcome_nodes_max_cache_size_bytes = negative_outcome_nodes_max_cache_size_bytes
-        self.negative_outcome_nodes_cache = cachetools.LRUCache(
+        self.negative_outcome_nodes_cache = cachetools.FIFOCache(
             maxsize=self.negative_outcome_nodes_max_cache_size_bytes)
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
