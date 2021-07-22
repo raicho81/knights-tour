@@ -1,7 +1,6 @@
 import statistics
 import logging
 from knightstour import KnightsTourAlgo
-from knightstour import FIFOSet
 
 
 logging.basicConfig(filename=__file__ + ".log",

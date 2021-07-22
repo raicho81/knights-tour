@@ -4,7 +4,7 @@ import sys
 
 class FIFOSet:
     """
-        Class representing a set, which can be bound in board_size. When the [[maximum]] board_size is reached the first
+        Class representing a set, which can be bound in board_size. When the [[maximum]] size is reached the first
         elements added equal to [[evict_count]] are removed to make place for new ones or if the elements are less than
         [[evict_count]] then only the available are evicted resulting in an empty set.
         If [[maxsize]] is None the set behaves like a
@@ -58,17 +58,17 @@ class FIFOSet:
 
     @property
     def maxsize(self):
-        """The maximum board_size of the cache."""
+        """The maximum size of the cache."""
         return self.__maxsize
 
     @property
     def currsize(self):
-        """The current board_size of the cache."""
+        """The current size of the cache."""
         return self.__currsize
 
     @staticmethod
     def getsizeof(value):
-        """Return the board_size of a cache element's value."""
+        """Return the size of a cache element's value."""
         return 1
 
     @property
@@ -81,3 +81,7 @@ class FIFOSet:
         """Return the # of misses"""
 
         return self.__misses
+
+    @property
+    def cache_info(self):
+        return f"FIFOSet Cache Info : [Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}]"
