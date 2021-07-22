@@ -1,8 +1,12 @@
 from string import ascii_lowercase as ascii_lc
 import time
 import logging
-import cachetools
 import functools
+
+import cachetools
+import cachetools.func
+
+from .simpleunboundcache import very_simple_unbound_int_cache
 
 
 class KnightsTourAlgo:
@@ -29,10 +33,12 @@ class KnightsTourAlgo:
 
     def init_internal_data(self):
         self.algo_start_time = time.time()
+        self.generated_paths_set = set()
         self.found_walks_count = 0
         self.negative_outcome_nodes_cache.clear()
         self.negative_outcome_nodes_cache_hits = 0
         self.negative_outcome_nodes_cache_misses = 0
+        self.find_possible_moves_helper.cache_clear()
 
     def negative_outcomes_cache_size(self):
         return self.negative_outcome_nodes_cache.currsize
@@ -49,7 +55,7 @@ class KnightsTourAlgo:
         res = [_ for _ in moves if _ not in current_path_set]
         return res
 
-    @cachetools.cached(cachetools.LRUCache(maxsize=1024))
+    @very_simple_unbound_int_cache(_board_size=5)
     def find_possible_moves_helper(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.
@@ -166,6 +172,22 @@ class KnightsTourAlgo:
                                .format(path, node, pms, next_node))
         self.generated_paths_set.add(tuple(path))
 
+    def print_info(self, what):
+        if self.found_walks_count % 50 == 0:
+            tt = time.time() - self.algo_start_time
+            logging.info("{} self.negative_outcome_nodes_cache board_size: {}".format(
+                what,
+                self.negative_outcome_nodes_cache.currsize))
+            logging.info("{} self.negative_outcome_nodes_cache_hits: {}".format(
+                what,
+                self.negative_outcome_nodes_cache_hits))
+            logging.info("{} self.negative_outcome_nodes_cache_misses: {}".format(
+                what,
+                self.negative_outcome_nodes_cache_misses))
+            logging.info("{} self.find_possible_moves_helper {}".format(
+                what,
+                self.find_possible_moves_helper.cache_info()))
+
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
             if self.run_time_checks:
@@ -177,14 +199,7 @@ class KnightsTourAlgo:
             else:
                 self.found_walks_count += 1
 
-            if self.found_walks_count % 50 == 0:
-                tt = time.time() - self.algo_start_time
-                logging.info("Current self.negative_outcome_nodes_cache size: {}".format(
-                    self.negative_outcome_nodes_cache.currsize))
-                logging.info("Current self.negative_outcome_nodes_cache_hits: {}".format(
-                    self.negative_outcome_nodes_cache_hits))
-                logging.info("Current self.negative_outcome_nodes_cache_misses: {}".format(
-                    self.negative_outcome_nodes_cache_misses))
+            self.print_info("Current")
 
             logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
@@ -252,8 +267,8 @@ class KnightsTourAlgo:
     def print_all_walks_info(self):
         logging.info("Total # of possible walks found: {}".format(self.found_walks_count))
         logging.info(
-            "self.find_possible_moves_helper : {}".format(self.find_possible_moves_helper))
-        logging.info("Final self.negative_outcome_nodes_cache size: {}".format(
+            "self.find_possible_moves_helper : {}".format(self.find_possible_moves_helper.cache_info()))
+        logging.info("Final self.negative_outcome_nodes_cache board_size: {}".format(
             self.negative_outcome_nodes_cache.currsize))
         logging.info("Final self.negative_outcome_nodes_cache_hits: {}".format(
             self.negative_outcome_nodes_cache_hits))
@@ -283,14 +298,14 @@ class KnightsTourAlgo:
 
     def run(self):
         logging.info("*** ALGO PARAMETERS START ***")
-        logging.info("Board size: {}x{}".format(self.board_size, self.board_size))
+        logging.info("Board board_size: {}x{}".format(self.board_size, self.board_size))
         logging.info("Brute force: {}".format(self.brute_force))
         logging.info("Run time checks: {}".format(self.run_time_checks))
         logging.info("Min negative path len: {}".format(self.min_negative_path_len))
-        logging.info("Negative outcome nodes max cache size: {}".format(self.negative_outcome_nodes_max_cache_size))
+        logging.info("Negative outcome nodes max cache board_size: {}".format(self.negative_outcome_nodes_max_cache_size))
         logging.info("*** ALGO PARAMETERS END ***")
         logging.info("Clearing Cache")
-
+        # self.find_possible_moves_helper.clear_cache()
         self.bootstrap_search()
 
         tt = time.time() - self.algo_start_time

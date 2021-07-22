@@ -3,13 +3,21 @@ import sys
 
 
 class FIFOSet:
-
-    def __init__(self, maxsize=None, evict_count=10000):
+    """
+        Class representing a set, which can be bound in board_size. When the [[maximum]] board_size is reached the first
+        elements added equal to [[evict_count]] are removed to make place for new ones or if the elements are less than
+        [[evict_count]] then only the available are evicted resulting in an empty set.
+        If [[maxsize]] is None the set behaves like a
+        ordinary set.
+    """
+    def __init__(self, maxsize=None, evict_count=1000):
         self.__maxsize = maxsize
         self.__currsize = 0
-        self.__set = set()
-        self.__set_fifo = collections.deque()
         self.__evict_count = evict_count
+        self.__hits = 0
+        self.__misses = 0
+        self.__set = set()
+        self.__set_first_added = collections.deque()
 
     def __repr__(self):
         return "%s(%r, maxsize=%r, currsize=%r)" % (
@@ -20,7 +28,13 @@ class FIFOSet:
         )
 
     def __contains__(self, key):
-        return key in self.__set
+        ret = key in self.__set
+        if ret:
+            self.__hits += 1
+        else:
+            self.__misses += 1
+
+        return ret
 
     def __iter__(self):
         return iter(self.__set)
@@ -29,30 +43,41 @@ class FIFOSet:
         return len(self.__set)
 
     def __sizeof__(self):
-        size = sys.getsizeof(self.__set) + sys.getsizeof(self.__set_fifo)
+        size = sys.getsizeof(self.__set) + sys.getsizeof(self.__set_first_added)
         return size
 
     def add(self, key):
-        while self.__maxsize and (self.__currsize + self.getsizeof(key)) >= self.__maxsize:
-            for _ in range(self.__evict_count):     # Evict some old elements
-                self.__set.remove(self.__set_fifo.popleft())
-                self.__currsize -= 1
+        if self.__maxsize and (self.__currsize + self.getsizeof(key)) > self.__maxsize:
+            for _ in range(self.__evict_count):
+                self.__set.remove(self.__set_first_added.popleft())
+                self.__currsize -= self.getsizeof(key)
 
-        self.__currsize += self.getsizeof(key)
-        self.__set_fifo.append(key)
+        self.__set_first_added.append(key)
         self.__set.add(key)
+        self.__currsize += self.getsizeof(key)
 
     @property
     def maxsize(self):
-        """The maximum size of the cache."""
+        """The maximum board_size of the cache."""
         return self.__maxsize
 
     @property
     def currsize(self):
-        """The current size of the cache."""
+        """The current board_size of the cache."""
         return self.__currsize
 
     @staticmethod
     def getsizeof(value):
-        """Return the size of a cache element's value."""
+        """Return the board_size of a cache element's value."""
         return 1
+
+    @property
+    def hits(self):
+        """Return the # of hits."""
+        return self.__hits
+
+    @property
+    def misses(self):
+        """Return the # of misses"""
+
+        return self.__misses
