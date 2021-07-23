@@ -29,7 +29,6 @@ class KnightsTourAlgo:
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
-        self.find_possible_moves_helper.cache_clear()
 
     def init_internal_data(self):
         self.algo_start_time = time.time()
@@ -101,9 +100,10 @@ class KnightsTourAlgo:
     @staticmethod
     def make_walk_path_string(walk):
         node = walk[0]
-        walk_string = "{}{}".format(ascii_lc[node[0]], node[1] + 1)
+        walk_string = "[{}{}".format(ascii_lc[node[0]], node[1] + 1)
         for node in walk[1:]:
             walk_string = "{}{}{}".format(walk_string, ascii_lc[node[0]], node[1] + 1)
+            walk_string += "]s"
         return walk_string
 
     def clear_bit(self, value, bit):
@@ -127,7 +127,7 @@ class KnightsTourAlgo:
             pms = self.find_possible_moves(path[-1], path)
             if not pms:
                 path.append(node)
-                raise RuntimeError("Previous node in the path doesn't have possible moves! path: {}".format(path))
+                raise RuntimeError("[Previous node in the path doesn't have possible moves! path: {}]".format(path))
 
             if len(pms) > 1:
                 break
@@ -146,7 +146,7 @@ class KnightsTourAlgo:
 
     def check_path(self, path):
         if len(path) != self.board_size ** 2:
-            raise RuntimeError("Invalid path length: {},  path: {}. Must be: {}".format(len(path), path, self.board_size ** 2))
+            raise RuntimeError("[Invalid path length: {},  path: {}. Must be: {}]".format(len(path), path, self.board_size ** 2))
         node = path[0]
         pms = self.find_possible_moves(node, path[0:1])
         for next_node_idx in range(1, len(path)):
@@ -154,19 +154,19 @@ class KnightsTourAlgo:
             pms = self.find_possible_moves(node, path[0:next_node_idx])
             if next_node not in pms:
                 raise RuntimeError(
-                    "Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}"
+                    "[Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}]"
                         .format(path, node, pms, next_node))
             node = next_node
         if tuple(path) in self.generated_paths_set:
-            raise RuntimeError("Path is already generated! path: {}, node: {}, pms: {}, next_node: {}"
+            raise RuntimeError("[Path is already generated! path: {}, node: {}, pms: {}, next_node: {}]"
                                .format(path, node, pms, next_node))
         self.generated_paths_set.add(tuple(path))
 
     def print_info(self, what):
-        logging.info("{} self.negative_outcome_nodes_cache Info: {}".format(
+        logging.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
-        logging.info("{} self.find_possible_moves_helper Info: {}".format(
+        logging.info("[{} self.find_possible_moves_helper Info: {}]".format(
             what,
             self.find_possible_moves_helper.cache_info()))
 
@@ -184,7 +184,7 @@ class KnightsTourAlgo:
             if self.found_walks_count and self.found_walks_count % 100 == 0:
                 self.print_info(what="Current")
 
-            logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            logging.info("[#{} {}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
             return True
 
@@ -242,10 +242,11 @@ class KnightsTourAlgo:
             current_path.pop()
 
     def print_all_walks_info(self):
-        logging.info("Total # of possible walks found: {}".format(self.found_walks_count))
+        logging.info("[# of possible walks found so far: {}]".format(self.found_walks_count))
         self.print_info(what="Final")
 
     def bootstrap_search(self):
+        logging.info("[Start search]".format(self.found_walks_count))
         possible_moves = []
 
         for x_coord in range(self.board_size):
@@ -267,15 +268,18 @@ class KnightsTourAlgo:
             self.find_walks([pm[0]], pm[1])
 
     def run(self):
-        logging.info("*** ALGO PARAMETERS START ***")
-        logging.info("Board board_size: {}x{}".format(self.board_size, self.board_size))
-        logging.info("Brute force: {}".format(self.brute_force))
-        logging.info("Run time checks: {}".format(self.run_time_checks))
-        logging.info("Min negative path len: {}".format(self.min_negative_path_len))
-        logging.info(
-            "Negative outcome nodes max cache board_size: {}".format(self.negative_outcome_nodes_max_cache_size))
-        logging.info("*** ALGO PARAMETERS END ***")
-        logging.info("Clearing Cache")
+        logging.info("[*** ALGO PARAMETERS START ***]")
+        logging.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
+        logging.info("[Brute force: {}]".format(self.brute_force))
+        logging.info("[Run time checks: {}]".format(self.run_time_checks))
+        logging.info("[Min negative path len: {}]".format(self.min_negative_path_len))
+        logging.info("[Negative outcome nodes max cache size: {}]".format(self.negative_outcome_nodes_max_cache_size))
+        logging.info("[*** ALGO PARAMETERS END ***]")
+        logging.info("[Clearing caches]")
+        self.find_possible_moves_helper.cache_clear()
+        self.negative_outcome_nodes_cache.cache_clear()
+        logging.info("[Caches cleared]")
+
         self.bootstrap_search()
 
         tt = time.time() - self.algo_start_time

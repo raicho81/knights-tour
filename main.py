@@ -21,7 +21,7 @@ def config_logging(json_conf):
 def load_config(config_name=CONFIG_DEFAULT_NAME):
     with open(config_name) as f:
         config_json_str = f.read()
-        print("JSON Config: ", config_json_str)
+        print("[JSON Config: {}]".format(config_json_str))
         config_json_obj = json.loads(config_json_str)
 
     return config_json_obj
@@ -30,7 +30,7 @@ def load_config(config_name=CONFIG_DEFAULT_NAME):
 def main():
     json_conf = load_config()
     config_logging(json_conf)
-    logging.info("[Loaded config file] - > {} ".format(CONFIG_DEFAULT_NAME))
+    logging.info("[Loaded config file: {}]".format(CONFIG_DEFAULT_NAME))
 
     runtimes = []
     runtimes_per_path = []
@@ -40,7 +40,7 @@ def main():
         logging.info("[*** TEST RUN # {} ***]".format(run_number + 1))
         kta = KnightsTourAlgo(json_conf["board_size"], brute_force=json_conf["brute_force"], run_time_checks=json_conf["run_time_checks"],
                               min_negative_path_len=json_conf["min_neg_path_length"], negative_outcome_nodes_max_cache=json_conf["neg_outcomes_cache_size"],
-                              percent_to_evict=json_conf["percent_to_evict"])
+                              percent_to_evict=json_conf["percent_to_evict_from_neg_nodes_cache"])
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

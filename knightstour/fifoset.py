@@ -1,5 +1,6 @@
 import collections
 import sys
+import logging
 
 
 class FIFOSet:
@@ -86,3 +87,12 @@ class FIFOSet:
     @property
     def cache_info(self):
         return f"FIFOSet Cache Info : [Hit Rate %: {100 * self.__hits / self.__misses}, Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}]"
+
+    def cache_clear(self):
+        """
+            Clear FIFOSet data
+        """
+        self.__set_first_added.clear()
+        self.__set.clear()
+        self.__currsize = 0
+        logging.info("[FIFOSet cache cleared]")

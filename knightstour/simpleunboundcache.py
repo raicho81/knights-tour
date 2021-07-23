@@ -1,4 +1,5 @@
 import functools
+import logging
 
 
 def very_simple_unbound_board_nodes_lut_cache(f):
@@ -30,6 +31,7 @@ def very_simple_unbound_board_nodes_lut_cache(f):
 
     def cache_clear():
         init_wrapper_data()
+        logging.info("[very_simple_unbound_board_nodes_lut_cache cleared]")
 
     def init_wrapper_data():
         wrapper.hits = 0
