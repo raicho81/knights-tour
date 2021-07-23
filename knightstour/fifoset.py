@@ -47,10 +47,8 @@ class FIFOSet:
 
     def add(self, key):
         if self.__maxsize and (self.__currsize + self.getsizeof(key)) > self.__maxsize:
-            for _ in range(self.__evict_count):
+            for _ in range(min(self.__evict_count, self.__currsize)):
                 k = self.__set_first_added.popleft()
-                if k == 26792947407:
-                    pass
                 self.__set.remove(k)
                 self.__currsize -= self.getsizeof(key)
 
