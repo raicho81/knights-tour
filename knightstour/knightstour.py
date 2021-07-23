@@ -48,8 +48,8 @@ class KnightsTourAlgo:
 
     @staticmethod
     def drop_out_moves_in_path(moves, path):
-        current_path_set = set(path)
-        res = [_ for _ in moves if _ not in current_path_set]
+        # current_path_set = set(path)
+        res = [_ for _ in moves if _ not in path]
         return res
 
     @simple_unbound_cache
@@ -100,10 +100,9 @@ class KnightsTourAlgo:
     @staticmethod
     def make_walk_path_string(walk):
         node = walk[0]
-        walk_string = "[{}{}".format(ascii_lc[node[0]], node[1] + 1)
+        walk_string = "{}{}".format(ascii_lc[node[0]], node[1] + 1)
         for node in walk[1:]:
             walk_string = "{}{}{}".format(walk_string, ascii_lc[node[0]], node[1] + 1)
-            walk_string += "]s"
         return walk_string
 
     def clear_bit(self, value, bit):
@@ -115,6 +114,12 @@ class KnightsTourAlgo:
         return value
 
     def make_node_mtx_ctx(self, path):
+        """
+            Compute path's "matrix context pattern" - path nodes are encoded as single bits in a integer.
+            The position of the bits set to "1" is relative to the path nodes coordinates.
+            This represents the pattern of the given path ignoring the order of the nodes in it meaning that the reversed path will have the same
+            matrix pattern and so on. This enables very fast searches of the paths already known to be with a dead end.
+        """
         mtx_ctx = 0
         b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
         mtx_ctx = self.set_bits(mtx_ctx, b)
@@ -192,7 +197,6 @@ class KnightsTourAlgo:
 
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
         new_pms = self.find_possible_moves(new_path[-1], new_path)
-        # to_filter = []
 
         # Filter negative outcome paths
         if new_pms and len(new_path) >= self.min_negative_path_len:
