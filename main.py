@@ -8,7 +8,7 @@ CONFIG_DEFAULT_NAME = "config.json"
 
 
 def config_logging(json_conf):
-    logging.basicConfig(filename=__file__ + ".{0}x{0}.log".format(json_conf["BOARD_SIZE"]),
+    logging.basicConfig(filename=json_conf["log_filename"] or __file__ + ".{0}x{0}.log".format(json_conf["board_size"]),
                         filemode="a+",
                         # encoding='utf-8',
                         format='[%(asctime)s] [%(levelname)s]: %(message)s',
@@ -31,11 +31,11 @@ def main():
     runtimes_per_path = []
 
     logging.info("[*** TEST START***]")
-    for run_number in range(json_conf["N_RUNS"]):
+    for run_number in range(json_conf["n_runs"]):
         logging.info("[*** TEST RUN # {} ***]".format(run_number + 1))
-        kta = KnightsTourAlgo(json_conf["BOARD_SIZE"], brute_force=json_conf["BRUTE_FORCE"], run_time_checks=json_conf["RUN_TIME_CHECKS"],
-                              min_negative_path_len=json_conf["MIN_NEG_PATH_LEN"], negative_outcome_nodes_max_cache=json_conf["NEG_OUTCOMES_CACHE"],
-                              percent_to_evict=json_conf["PERCENT_TO_EVICT"])
+        kta = KnightsTourAlgo(json_conf["board_size"], brute_force=json_conf["brute_force"], run_time_checks=json_conf["run_time_checks"],
+                              min_negative_path_len=json_conf["min_neg_path_length"], negative_outcome_nodes_max_cache=json_conf["neg_outcomes_cache_size"],
+                              percent_to_evict=json_conf["percent_to_evict"])
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

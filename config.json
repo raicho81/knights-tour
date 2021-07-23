@@ -1,9 +1,10 @@
 {
-  "BOARD_SIZE": 5,
-  "N_RUNS": 10,
-  "NEG_OUTCOMES_CACHE": 50000000,
-  "PERCENT_TO_EVICT": 10,
-  "MIN_NEG_PATH_LEN": 3,
-  "RUN_TIME_CHECKS": false,
-  "BRUTE_FORCE": true
+  "board_size": 5,
+  "n_runs": 10,
+  "neg_outcomes_cache_size": 50000000,
+  "percent_to_evict": 10,
+  "min_neg_path_length": 3,
+  "run_time_checks": false,
+  "brute_force": true,
+  "log_filename": null
 }
