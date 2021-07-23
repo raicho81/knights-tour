@@ -2,11 +2,10 @@ import functools
 import math
 
 
-def very_simple_unbound_int_cache(size):
-    row_and_col_size = math.ceil(math.sqrt(size))
+def very_simple_unbound_int_cache(_board_size):
 
     def key(node):
-        return (node[1] * row_and_col_size + node[0]) % size
+        return (node[1] * _board_size + node[0]) % _board_size ** 2
 
     def inner(f):
 
@@ -28,8 +27,7 @@ def very_simple_unbound_int_cache(size):
             init_wrapper_data()
 
         def init_wrapper_data():
-            wrapper.cache = None
-            wrapper.cache = [None] * size
+            wrapper.cache = [None] * _board_size ** 2
             wrapper.hits = 0
             wrapper.misses = 0
 

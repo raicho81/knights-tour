@@ -50,7 +50,7 @@ class KnightsTourAlgo:
         res = [_ for _ in moves if _ not in current_path_set]
         return res
 
-    @very_simple_unbound_int_cache(size=25)
+    @very_simple_unbound_int_cache(_board_size=6)
     def find_possible_moves_helper(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.
