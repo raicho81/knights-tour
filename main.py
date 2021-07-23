@@ -18,7 +18,7 @@ def main():
     for run_number in range(10):
         logging.info("*** TEST RUN # {} ***".format(run_number + 1))
         kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2,
-                              negative_outcome_nodes_max_cache_size_bytes=20 * 1000 * 1000)
+                              negative_outcome_nodes_max_cache=20 * 1000 * 1000, percent_to_evict=3)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

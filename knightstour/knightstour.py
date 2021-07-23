@@ -16,14 +16,16 @@ class KnightsTourAlgo:
     """
 
     def __init__(self, board_size, brute_force=False, run_time_checks=True, min_negative_path_len=2,
-                 negative_outcome_nodes_max_cache_size_bytes=10 * 1000 * 1000):
+                 negative_outcome_nodes_max_cache=10 * 1000 * 1000, percent_to_evict=3):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
-        self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache_size_bytes
+        self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache
+
+        # Evict percent_to_evict % of the cache when the size limit is reached
         self.negative_outcome_nodes_cache = FIFOSet(maxsize=self.negative_outcome_nodes_max_cache_size,
-                                                    evict_count=math.ceil(negative_outcome_nodes_max_cache_size_bytes / 20))  # evict 5% of the cache when the size limit is reached
+                                                    evict_count=math.ceil(negative_outcome_nodes_max_cache * percent_to_evict / 100.0))
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -51,7 +53,7 @@ class KnightsTourAlgo:
         res = [_ for _ in moves if _ not in current_path_set]
         return res
 
-    @very_simple_unbound_int_cache(_board_size=6)
+    @very_simple_unbound_int_cache
     def find_possible_moves_helper(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.
