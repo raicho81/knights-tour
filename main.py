@@ -4,20 +4,26 @@ from knightstour import KnightsTourAlgo
 import json
 
 
-CONFIG_DEFAULT_NAME = "config.json"
+CONFIG_DEFAULT_NAME = "default-config.json"
 
 
 def config_logging(json_conf):
-    logging.basicConfig(filename=json_conf["log_filename"] or __file__ + ".{0}x{0}.log".format(json_conf["board_size"]),
-                        filemode="a+",
+    log_filename = json_conf["log_filename"] or __file__
+    log_filename += ".{0}x{0}.log".format(json_conf["board_size"])
+    logging.basicConfig(filename=log_filename,
+                        filemode=json_conf["log_file_mode"],
                         # encoding='utf-8',
                         format='[%(asctime)s] [%(levelname)s]: %(message)s',
                         level=logging.DEBUG)
+    print("[Logging configured. Log filename: {}]".format(log_filename))
 
 
 def load_config(config_name=CONFIG_DEFAULT_NAME):
     with open(config_name) as f:
-        config_json_obj = json.load(f)
+        config_json_str = f.read()
+        print("JSON Config: ", config_json_str)
+        config_json_obj = json.loads(config_json_str)
+
     return config_json_obj
 
 
@@ -25,7 +31,6 @@ def main():
     json_conf = load_config()
     config_logging(json_conf)
     logging.info("[Loaded config file] - > {} ".format(CONFIG_DEFAULT_NAME))
-    logging.info("[Logging configured]")
 
     runtimes = []
     runtimes_per_path = []
