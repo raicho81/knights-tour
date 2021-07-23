@@ -87,4 +87,4 @@ class FIFOSet:
 
     @property
     def cache_info(self):
-        return f"FIFOSet Cache Info : [Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}]"
+        return f"FIFOSet Cache Info : [Hit Rate %: {100 * self.__hits / self.__misses}, Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}]"

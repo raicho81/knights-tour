@@ -1,3 +1,4 @@
+import math
 from string import ascii_lowercase as ascii_lc
 import time
 import logging
@@ -14,7 +15,7 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule. Switching between them is done via the [[brute_force]] parameter.
     """
 
-    def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2,
+    def __init__(self, board_size, brute_force=False, run_time_checks=True, min_negative_path_len=2,
                  negative_outcome_nodes_max_cache_size_bytes=10 * 1000 * 1000):
         self.board_size = board_size
         self.found_walks_count = 0
@@ -22,7 +23,7 @@ class KnightsTourAlgo:
         self.algo_start_time = time.time()
         self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache_size_bytes
         self.negative_outcome_nodes_cache = FIFOSet(maxsize=self.negative_outcome_nodes_max_cache_size,
-                                                    evict_count=1000)
+                                                    evict_count=math.ceil(negative_outcome_nodes_max_cache_size_bytes / 20))  # evict 5% of the cache when the size limit is reached
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -178,7 +179,8 @@ class KnightsTourAlgo:
             else:
                 self.found_walks_count += 1
 
-            self.print_info(what="Current")
+            if self.found_walks_count and self.found_walks_count % 100:
+                self.print_info(what="Current")
 
             logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
