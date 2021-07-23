@@ -131,7 +131,9 @@ class KnightsTourAlgo:
 
             if len(pms) > 1:
                 break
+
             self.add_to_negative_outcome_nodes_cache(path)
+
         self.add_to_negative_outcome_nodes_cache(path)
 
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):

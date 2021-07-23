@@ -3,7 +3,16 @@ import logging
 from knightstour import KnightsTourAlgo
 
 
-logging.basicConfig(filename=__file__ + ".log",
+BOARD_SIZE = 6
+N_RUNS = 2
+NEG_OUTCOMES_CACHE = 50 * 1000 * 1000
+PERCENT_TO_EVICT = 5
+MIN_NEG_PATH_LEN = 2
+RUN_TIME_CHECKS = False
+BRUTE_FORCE = True
+
+
+logging.basicConfig(filename=__file__ + ".{0}x{0}.log".format(BOARD_SIZE),
                     filemode="a+",
                     # encoding='utf-8',
                     format='[%(asctime)s] [%(levelname)s]: %(message)s',
@@ -15,10 +24,10 @@ def main():
     runtimes_per_path = []
 
     logging.info("*** TEST START***")
-    for run_number in range(10):
+    for run_number in range(N_RUNS):
         logging.info("*** TEST RUN # {} ***".format(run_number + 1))
-        kta = KnightsTourAlgo(5, brute_force=True, run_time_checks=False, min_negative_path_len=2,
-                              negative_outcome_nodes_max_cache=20 * 1000 * 1000, percent_to_evict=3)
+        kta = KnightsTourAlgo(BOARD_SIZE, brute_force=BRUTE_FORCE, run_time_checks=RUN_TIME_CHECKS, min_negative_path_len=MIN_NEG_PATH_LEN,
+                              negative_outcome_nodes_max_cache=NEG_OUTCOMES_CACHE, percent_to_evict=PERCENT_TO_EVICT)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
