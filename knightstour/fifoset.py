@@ -57,7 +57,7 @@ class FIFOSet:
         if key not in self.__set:
             self.__set_first_added.append(key)
             self.__set.add(key)
-        self.__currsize += self.getsizeof(key)
+            self.__currsize += self.getsizeof(key)
 
     @property
     def maxsize(self):

@@ -11,7 +11,7 @@ class KnightsTourAlgo:
     """
         Algo for finding all knights tours by brute force with some caching implemented for speeding up the
         solutions. Also there is a non brute force version implemented, which is using Warnsdorff's rule
-        https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule
+        https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule. Switching between them is done via the [[brute_force]] parameter.
     """
 
     def __init__(self, board_size, brute_force=False, run_time_checks=False, min_negative_path_len=2,
