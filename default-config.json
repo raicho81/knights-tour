@@ -1,6 +1,7 @@
 {
-  "board_size": 6,
-  "n_runs": 2,
+  "board_size": 5,
+  "n_runs": 10,
+  "cache": true,
   "neg_outcomes_cache_size": 50000000,
   "percent_to_evict_from_neg_nodes_cache": 5,
   "min_neg_path_length": 2,

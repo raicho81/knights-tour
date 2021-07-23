@@ -16,16 +16,16 @@ class KnightsTourAlgo:
     """
 
     def __init__(self, board_size, brute_force=False, run_time_checks=True, min_negative_path_len=2,
-                 negative_outcome_nodes_max_cache=10 * 1000 * 1000, percent_to_evict=3):
+                 negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3):
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
-        self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache
+        self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache_size
 
         # Evict percent_to_evict % of the cache when the size limit is reached
         self.negative_outcome_nodes_cache = FIFOSet(maxsize=self.negative_outcome_nodes_max_cache_size,
-                                                    evict_count=math.ceil(negative_outcome_nodes_max_cache * percent_to_evict / 100.0))
+                                                    evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0))
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -48,9 +48,7 @@ class KnightsTourAlgo:
 
     @staticmethod
     def drop_out_moves_in_path(moves, path):
-        # current_path_set = set(path)
-        res = [_ for _ in moves if _ not in path]
-        return res
+        return [x for x in moves if x not in path]
 
     @simple_unbound_cache
     def find_possible_moves_helper(self, node):
@@ -190,7 +188,7 @@ class KnightsTourAlgo:
             if self.found_walks_count and self.found_walks_count % 100 == 0:
                 self.print_info(what="Current")
 
-            logging.info("[#{} {}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            logging.info("[#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
             return True
 
@@ -291,4 +289,4 @@ class KnightsTourAlgo:
         self.print_all_walks_info()
         logging.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
         logging.info("*** ALGO END ***".format())
-        return tt, tt / self.found_walks_count
+        return tt, tt / (self.found_walks_count or 1)
