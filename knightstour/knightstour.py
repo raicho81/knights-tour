@@ -159,14 +159,12 @@ class KnightsTourAlgo:
         self.generated_paths_set.add(tuple(path))
 
     def print_info(self, what):
-        if self.found_walks_count % 50 == 0:
-            tt = time.time() - self.algo_start_time
-            logging.info("{} self.negative_outcome_nodes_cache info: {}".format(
-                what,
-                self.negative_outcome_nodes_cache.cache_info))
-            logging.info("{} self.find_possible_moves_helper {}".format(
-                what,
-                self.find_possible_moves_helper.cache_info()))
+        logging.info("{} self.negative_outcome_nodes_cache Info: {}".format(
+            what,
+            self.negative_outcome_nodes_cache.cache_info))
+        logging.info("{} self.find_possible_moves_helper Info{}".format(
+            what,
+            self.find_possible_moves_helper.cache_info()))
 
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
@@ -179,7 +177,7 @@ class KnightsTourAlgo:
             else:
                 self.found_walks_count += 1
 
-            if self.found_walks_count and self.found_walks_count % 100:
+            if self.found_walks_count and self.found_walks_count % 100 == 0:
                 self.print_info(what="Current")
 
             logging.info("#{} {}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
