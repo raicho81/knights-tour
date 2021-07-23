@@ -4,7 +4,7 @@ import time
 import logging
 import functools
 
-from .simpleunboundcache import very_simple_unbound_board_nodes_cache
+from .simpleunboundcache import very_simple_unbound_board_nodes_lut_cache
 from knightstour import FIFOSet
 
 
@@ -53,7 +53,7 @@ class KnightsTourAlgo:
         res = [_ for _ in moves if _ not in current_path_set]
         return res
 
-    @very_simple_unbound_board_nodes_cache
+    @very_simple_unbound_board_nodes_lut_cache
     def find_possible_moves_helper(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.
@@ -166,7 +166,7 @@ class KnightsTourAlgo:
         logging.info("{} self.negative_outcome_nodes_cache Info: {}".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
-        logging.info("{} self.find_possible_moves_helper Info{}".format(
+        logging.info("{} self.find_possible_moves_helper Info: {}".format(
             what,
             self.find_possible_moves_helper.cache_info()))
 
@@ -201,16 +201,10 @@ class KnightsTourAlgo:
                 mtx_ctx = self.compute_mtx_ctx(new_path)
 
                 if mtx_ctx in self.negative_outcome_nodes_cache:
-                    # to_filter.append(new_pm_node)
-                    # self.negative_outcome_nodes_cache_hits += 1
-                    new_pms.remove(new_pm_node)
-                # else:
-                # self.negative_outcome_nodes_cache_misses += 1
+                    new_pms.remove(new_pm_node)     # It really beats me why this is working correctly. Try changing it to something else ... Like saving the values you have to
+                    # remove and remove them later and observe the results.
 
                 new_path.pop()
-
-        # for node in to_filter:
-        #     new_pms.remove(node)
 
         if new_pms:
             current_new_paths_pms.append((new_path[-1], new_pms))

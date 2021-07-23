@@ -1,0 +1,9 @@
+{
+  "BOARD_SIZE": 5,
+  "N_RUNS": 10,
+  "NEG_OUTCOMES_CACHE": 50000000,
+  "PERCENT_TO_EVICT": 10,
+  "MIN_NEG_PATH_LEN": 3,
+  "RUN_TIME_CHECKS": false,
+  "BRUTE_FORCE": true
+}
