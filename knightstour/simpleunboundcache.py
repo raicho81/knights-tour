@@ -2,7 +2,7 @@ import functools
 import logging
 
 
-def very_simple_unbound_board_nodes_lut_cache(f):
+def simple_unbound_cache(f):
     """
         Very simple (and hopefully very fast) unbound cache of the nodes possible moves.
         Realised as a simple list with a very simple hash function to map the input (node) to the output list (moves)  with a <=> (equivalence) relation.

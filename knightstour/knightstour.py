@@ -4,7 +4,7 @@ import time
 import logging
 import functools
 
-from .simpleunboundcache import very_simple_unbound_board_nodes_lut_cache
+from .simpleunboundcache import simple_unbound_cache
 from knightstour import FIFOSet
 
 
@@ -52,7 +52,7 @@ class KnightsTourAlgo:
         res = [_ for _ in moves if _ not in current_path_set]
         return res
 
-    @very_simple_unbound_board_nodes_lut_cache
+    @simple_unbound_cache
     def find_possible_moves_helper(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.

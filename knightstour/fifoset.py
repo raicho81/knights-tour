@@ -20,11 +20,14 @@ class FIFOSet:
         self.__set_first_added = collections.deque()
 
     def __repr__(self):
-        return "%s(%r, maxsize=%r, currsize=%r)" % (
+        return "{}({}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
             self.__class__.__name__,
             self.__set.__repr__(),
             self.__maxsize,
             self.__currsize,
+            self.__hits,
+            self.__misses,
+            self.__evict_count,
         )
 
     def __contains__(self, key):
@@ -95,4 +98,6 @@ class FIFOSet:
         self.__set_first_added.clear()
         self.__set.clear()
         self.__currsize = 0
+        self.__hits = 0
+        self.__misses = 0
         logging.info("[FIFOSet cache cleared]")
