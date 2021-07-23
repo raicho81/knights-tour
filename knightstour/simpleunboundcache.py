@@ -2,7 +2,7 @@ import functools
 import math
 
 
-def very_simple_unbound_int_cache(f):
+def very_simple_unbound_board_nodes_cache(f):
 
     def key(node):
         return (node[1] * wrapper.board_size + node[0]) % wrapper.board_size ** 2
@@ -34,8 +34,10 @@ def very_simple_unbound_int_cache(f):
         wrapper.board_size = 0
         wrapper.cache = [None] * wrapper.board_size ** 2
 
+    # Init the wrapper internal data
     init_wrapper_data()
 
+    # Add instrumentation to the wrapped function
     wrapper.cache_clear = cache_clear
     wrapper.cache_info = lambda: f"simple_unbound_cache Info : [Cached function: {wrapper.__name__}, " \
                                  f"Hits: {wrapper.hits}, Misses: {wrapper.misses}, Size: {len(wrapper.cache)}"

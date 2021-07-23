@@ -4,10 +4,10 @@ import sys
 
 class FIFOSet:
     """
-        Class representing a set, which can be bound in size. When the [[maximum]] size is reached the first
-        elements added equal to [[evict_count]] are removed to make place for new ones or if the elements are less than
-        [[evict_count]] then only the available are evicted resulting in an empty set.
-        If [[maxsize]] is None the set behaves like a       ordinary set.
+        Class representing a set, which can be bound in size. When the maximum size is reached the first
+        elements added equal to evict_count are removed to make place for new ones or if the elements are less than
+        evict_count then only the available are evicted resulting in an empty set.
+        If maxsize is None the set behaves like an ordinary set().
     """
     def __init__(self, maxsize=None, evict_count=1000):
         self.__maxsize = maxsize
