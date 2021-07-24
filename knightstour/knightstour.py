@@ -15,8 +15,9 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule. Switching between them is done via the [[brute_force]] parameter.
     """
 
-    def __init__(self, board_size, brute_force=False, run_time_checks=True, min_negative_path_len=2,
+    def __init__(self, board_size, brute_force=False, run_time_checks=True, enable_cache=True, min_negative_path_len=2,
                  negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3):
+        self.enable_cache = enable_cache
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
@@ -34,8 +35,7 @@ class KnightsTourAlgo:
         self.algo_start_time = time.time()
         self.generated_paths_set = set()
         self.found_walks_count = 0
-        self.negative_outcome_nodes_cache.clear()
-        self.find_possible_moves_helper.cache_clear()
+        self.enable_cache and (self.negative_outcome_nodes_cache.clear(), self.find_possible_moves_helper.cache_clear())
 
     def negative_outcomes_cache_size(self):
         return self.negative_outcome_nodes_cache.currsize
@@ -51,7 +51,10 @@ class KnightsTourAlgo:
         return [x for x in moves if x not in path]
 
     @simple_unbound_cache
-    def find_possible_moves_helper(self, node):
+    def find_possible_moves_cached(self, node):
+        return self.find_possible_moves_non_cached(node)
+
+    def find_possible_moves_non_cached(self, node):
         possible_moves = []
         # Find all new possible moves by the rules for moving a Knight figure on the Chess desk from a given square.
         # There are at most 8 possible moves from the current square. Of course we must check if a possible move is not
@@ -93,7 +96,10 @@ class KnightsTourAlgo:
         return possible_moves
 
     def find_possible_moves(self, node, path):
-        return self.drop_out_moves_in_path(self.find_possible_moves_helper(node), path)
+        if self.enable_cache:
+            return self.drop_out_moves_in_path(self.find_possible_moves_cached(node), path)
+        else:
+            return self.drop_out_moves_in_path(self.find_possible_moves_non_cached(node), path)
 
     @staticmethod
     def make_walk_path_string(walk):
@@ -166,13 +172,17 @@ class KnightsTourAlgo:
                                .format(path, node, pms, next_node))
         self.generated_paths_set.add(tuple(path))
 
-    def print_info(self, what):
+    def log_cache_info(self, what):
+        if not self.enable_cache:
+            return
+
         logging.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
+
         logging.info("[{} self.find_possible_moves_helper Info: {}]".format(
             what,
-            self.find_possible_moves_helper.cache_info()))
+            self.find_possible_moves_cached.cache_info()))
 
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
@@ -186,19 +196,24 @@ class KnightsTourAlgo:
                 self.found_walks_count += 1
 
             if self.found_walks_count and self.found_walks_count % 100 == 0:
-                self.print_info(what="Current")
+                self.log_cache_info(what="Current")
 
-            logging.info("[#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            logging.info("[Path#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
             return True
 
         return False
 
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
+        """
+            Filter negative outcome paths if cache is enabled otherwise
+            just proceed with finding the possible moves for this path.
+            :param new_path: path to check in negative outcomes cache set
+            :param current_new_paths_pms: All found possible moves
+            (if any) for this path are added to this list
+        """
         new_pms = self.find_possible_moves(new_path[-1], new_path)
-
-        # Filter negative outcome paths
-        if new_pms and len(new_path) >= self.min_negative_path_len:
+        if self.enable_cache and new_pms and len(new_path) >= self.min_negative_path_len:
             for new_pm_node in new_pms:
                 new_path.append(new_pm_node)
                 mtx_ctx = self.compute_mtx_ctx(new_path)
@@ -212,9 +227,15 @@ class KnightsTourAlgo:
         if new_pms:
             current_new_paths_pms.append((new_path[-1], new_pms))
         else:
-            self.check_negative_node_previous_node_pms_and_cache(new_path)
+            self.enable_cache and self.check_negative_node_previous_node_pms_and_cache(new_path)
 
     def find_walks(self, current_path, possible_moves):
+        """
+            Recursive function for exploring the graph search space.
+        :param current_path: current path in consideration
+        :param possible_moves: possible moves list for this path
+        :return:
+        """
         current_new_paths_pms = []
 
         for possible_move in possible_moves:
@@ -246,7 +267,7 @@ class KnightsTourAlgo:
 
     def print_all_walks_info(self):
         logging.info("[# of possible walks found so far: {}]".format(self.found_walks_count))
-        self.print_info(what="Final")
+        self.log_cache_info(what="Final")
 
     def bootstrap_search(self):
         logging.info("[Start search]".format(self.found_walks_count))
@@ -274,14 +295,15 @@ class KnightsTourAlgo:
         logging.info("[*** ALGO PARAMETERS START ***]")
         logging.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
         logging.info("[Brute force: {}]".format(self.brute_force))
+        logging.info("[Cache enabled: {}]".format(self.enable_cache))
         logging.info("[Run time checks: {}]".format(self.run_time_checks))
-        logging.info("[Min negative path len: {}]".format(self.min_negative_path_len))
-        logging.info("[Negative outcome nodes max cache size: {}]".format(self.negative_outcome_nodes_max_cache_size))
+        self.enable_cache and (logging.info("[Min negative path len: {}]".format(self.min_negative_path_len)),
+                               logging.info("[Negative outcome nodes max cache size: {}]".format(self.negative_outcome_nodes_max_cache_size)))
         logging.info("[*** ALGO PARAMETERS END ***]")
-        logging.info("[Clearing caches]")
-        self.find_possible_moves_helper.cache_clear()
-        self.negative_outcome_nodes_cache.cache_clear()
-        logging.info("[Caches cleared]")
+        self.enable_cache and (logging.info("[Clearing caches]"),
+                               self.find_possible_moves_cached.cache_clear(),
+                               self.negative_outcome_nodes_cache.cache_clear(),
+                               logging.info("[Caches cleared]"))
 
         self.bootstrap_search()
 
