@@ -1,0 +1,16 @@
+{
+  "default": {
+    "board_size": 5,
+    "n_runs": 10,
+    "enable_cache": true,
+    "neg_outcomes_cache_size": 50000000,
+    "percent_to_evict_from_neg_nodes_cache": 5,
+    "min_neg_path_length": 2,
+    "run_time_checks": false,
+    "brute_force": true,
+    "log_filename": null,
+    "log_file_mode": "a+",
+    "redis_host": "192.168.1.3",
+    "redis_port": 6379
+  }
+}

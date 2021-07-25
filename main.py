@@ -3,57 +3,35 @@ import logging
 from knightstour import KnightsTourAlgo
 import json
 import sys
+from dynaconf import settings
 
 
-CONFIG_DEFAULT_NAME = "default-config.json"
-
-
-def config_logging(json_conf):
-    log_filename = json_conf["log_filename"] or __file__
-    log_filename += ".{0}x{0}.log".format(json_conf["board_size"])
+def config_logging():
+    log_filename = settings.LOG_FILENAME or __file__
+    log_filename += ".{0}x{0}.log".format(settings.BOARD_SIZE)
     logging.basicConfig(filename=log_filename,
-                        filemode=json_conf["log_file_mode"],
+                        filemode=settings.LOG_FILE_MODE,
                         # encoding='utf-8',
                         format='[%(asctime)s %(levelname)s] %(message)s',
                         level=logging.DEBUG)
     print("[Logging configured. Log filename is: {}]".format(log_filename))
 
 
-def load_config(config_name=CONFIG_DEFAULT_NAME):
-    with open(config_name) as f:
-        config_json_str = f.read()
-        print("[Loaded JSON Config File: "
-              "{}"
-              "]".format(config_json_str))
-        config_json_obj = json.loads(config_json_str)
-
-    return config_json_obj
-
-
 def main():
-    # Accept config file as the first parameter of the script
-    if len(sys.argv) > 1:
-        conf_file = sys.argv[1]
-    else:
-        conf_file = None
-
-    json_conf = load_config() if conf_file is None else load_config(conf_file)
-    config_logging(json_conf)
-    logging.info("[Loaded config file: {}]".format(conf_file or CONFIG_DEFAULT_NAME))
-
+    config_logging()
     runtimes = []
     runtimes_per_path = []
 
     logging.info("[*** TEST START***]")
-    for run_number in range(json_conf["n_runs"]):
+    for run_number in range(settings.N_RUNS):
         logging.info("[*** TEST RUN # {} ***]".format(run_number + 1))
-        kta = KnightsTourAlgo(json_conf["board_size"],
-                              brute_force=json_conf["brute_force"],
-                              run_time_checks=json_conf["run_time_checks"],
-                              enable_cache=json_conf["enable_cache"],
-                              min_negative_path_len=json_conf["min_neg_path_length"],
-                              negative_outcome_nodes_max_cache_size=json_conf["neg_outcomes_cache_size"],
-                              percent_to_evict=json_conf["percent_to_evict_from_neg_nodes_cache"])
+        kta = KnightsTourAlgo(board_size=settings.BOARD_SIZE,
+                              brute_force=settings.BRUTE_FORCE,
+                              run_time_checks=settings.RUN_TIME_CHECKS,
+                              enable_cache=settings.ENABLE_CACHE,
+                              min_negative_path_len=settings.MIN_NEG_PATH_LENGTH,
+                              negative_outcome_nodes_max_cache_size=settings.NEG_OUTCOMES_CACHE_SIZE,
+                              percent_to_evict=settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

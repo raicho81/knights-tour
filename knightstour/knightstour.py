@@ -3,9 +3,11 @@ from string import ascii_lowercase as ascii_lc
 import time
 import logging
 import functools
+from threading import Timer
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import FIFOSet
+import knightstour.celery_tasks
 
 
 class KnightsTourAlgo:
@@ -30,6 +32,14 @@ class KnightsTourAlgo:
         self.generated_paths_set = set()
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
+        self.log_cache_info_timer = Timer(5, self.log_cache_info_timer_handle)
+        self.log_cache_info_timer.setDaemon(True)
+
+    def log_cache_info_timer_handle(self):
+        self.log_cache_info("Current")
+        self.log_cache_info_timer = Timer(10, self.log_cache_info_timer_handle)
+        self.log_cache_info_timer.setDaemon(True)
+        self.log_cache_info_timer.start()
 
     def init_internal_data(self):
         self.algo_start_time = time.time()
@@ -142,16 +152,17 @@ class KnightsTourAlgo:
             if len(pms) > 1:
                 break
 
-            self.add_to_negative_outcome_nodes_cache(path)
+            self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
 
-        self.add_to_negative_outcome_nodes_cache(path)
+        self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
 
-    def add_to_negative_outcome_nodes_cache(self, dead_end_path):
-        mtx_ctx = self.compute_mtx_ctx(dead_end_path)
-        self.negative_outcome_nodes_cache.add(mtx_ctx)
+    def add_to_negative_outcome_nodes_cache(self, dead_end_path):   # This is going to Celery and will be working with the Redis cache instead of local cache
+        mtx_ctx = self.compute_mtx_ctx(dead_end_path)   # Compute in Celery
+        self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add in Redis SET
 
-    def compute_mtx_ctx(self, path):
-        mtx_ctx = self.make_node_mtx_ctx(path)
+    def compute_mtx_ctx(self, path):    # Move to Celery
+        # mtx_ctx = self.make_node_mtx_ctx(path)
+        mtx_ctx = knightstour.celery_tasks.make_node_mtx_ctx(path, self.board_size)
         return mtx_ctx
 
     def check_path(self, path):
@@ -190,13 +201,11 @@ class KnightsTourAlgo:
                 try:
                     self.check_path(new_path)
                     self.found_walks_count += 1
+                    # This goes to Redis it is a shared state
                 except RuntimeError as rte:
                     logging.error(rte)
             else:
                 self.found_walks_count += 1
-
-            if self.found_walks_count and self.found_walks_count % 100 == 0:
-                self.log_cache_info(what="Current")
 
             logging.info("[Path#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
@@ -218,14 +227,14 @@ class KnightsTourAlgo:
                 new_path.append(new_pm_node)
                 mtx_ctx = self.compute_mtx_ctx(new_path)
 
-                if mtx_ctx in self.negative_outcome_nodes_cache:
+                if mtx_ctx in self.negative_outcome_nodes_cache:    # This goes to Redis too - it will be shared by all the workers.
                     new_pms.remove(new_pm_node)     # It really beats me why this is working correctly. Try changing it to something else ... Like saving the values you have to
                     # remove and remove them later and observe the results.
 
                 new_path.pop()
 
         if new_pms:
-            current_new_paths_pms.append((new_path[-1], new_pms))
+            current_new_paths_pms.append((new_path[-1], new_pms)) # I guess I have to return current_new_paths_pms as a result of the function
         else:
             self.enable_cache and self.check_negative_node_previous_node_pms_and_cache(new_path)
 
@@ -305,7 +314,10 @@ class KnightsTourAlgo:
                                self.negative_outcome_nodes_cache.cache_clear(),
                                logging.info("[Caches cleared]"))
 
+        self.log_cache_info_timer.start()
         self.bootstrap_search()
+        self.log_cache_info_timer.cancel()
+        self.log_cache_info_timer = None
 
         tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
