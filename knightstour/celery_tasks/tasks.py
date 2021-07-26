@@ -1,11 +1,8 @@
 from celery import Celery
+from dynaconf import settings
 
-app = Celery('tasks', broker='pyamqp://guest@192.168.1.3//')
 
-
-@app.task
-def add(x, y):
-    return x + y
+app = Celery('tasks', broker=settings.TASKS_BROKER, backend=settings.TASKS_BACKEND)
 
 
 def set_bits(value, bits):
@@ -27,3 +24,9 @@ def make_node_mtx_ctx(path, board_size):
     b = [(path_node[1] * board_size + path_node[0]) for path_node in path]
     mtx_ctx = set_bits(mtx_ctx, b)
     return mtx_ctx
+
+
+@app.task
+def run_knights_tour_task(f, *args, **kwargs):
+    res = f(*args, **kwargs)
+    return res
