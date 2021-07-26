@@ -2,7 +2,7 @@ from celery import Celery
 from dynaconf import settings
 
 
-app = Celery('tasks', broker=settings.TASKS_BROKER, backend=settings.TASKS_BACKEND)
+app = Celery('tasks', broker=settings.CELERY_TASKS_BROKER, backend=settings.CELERY_TASKS_BACKEND)
 
 
 def set_bits(value, bits):

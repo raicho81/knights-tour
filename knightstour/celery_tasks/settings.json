@@ -1,9 +1,9 @@
 {
   "default": {
-    "tasks_log_filename": null,
-    "tasks_log_file_mode": "a+",
-    "tasks_redis": "192.168.1.3:6379",
-    "tasks_broker": "pyamqp://guest@192.168.1.3//",
-    "tasks_backend": null
+    "celery_tasks_log_filename": null,
+    "celery_tasks_log_file_mode": "a+",
+    "celery_tasks_redis": "192.168.1.3:6379",
+    "celery_tasks_broker": "pyamqp://guest@192.168.1.3//",
+    "celery_tasks_backend": null
   }
 }
