@@ -10,7 +10,7 @@ services:
   redis:
     image: redis
     restart: always
-    command: redis-server --requirepass secret --appendonly yes --rds yes
+    command: redis-server --requirepass secret --appendonly yes
     ports:
       - 6379:6379
     volumes:
