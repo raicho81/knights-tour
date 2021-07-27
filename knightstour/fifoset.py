@@ -1,6 +1,7 @@
 import collections
 import sys
 import logging
+import redis
 
 
 class FIFOSet:

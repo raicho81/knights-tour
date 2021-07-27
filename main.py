@@ -1,8 +1,6 @@
 import statistics
 import logging
 from knightstour import KnightsTourAlgo
-import json
-import sys
 from dynaconf import settings
 
 
@@ -31,7 +29,10 @@ def main():
                               enable_cache=settings.ENABLE_CACHE,
                               min_negative_path_len=settings.MIN_NEG_PATH_LENGTH,
                               negative_outcome_nodes_max_cache_size=settings.NEG_OUTCOMES_CACHE_SIZE,
-                              percent_to_evict=settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE)
+                              percent_to_evict=settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE,
+                              redis_host=settings.REDIS_HOST,
+                              redis_port=settings.REDIS_PORT,
+                              redis_password=settings.REDIS_PASSWORD)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

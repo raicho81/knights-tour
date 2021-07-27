@@ -10,7 +10,8 @@
     "brute_force": true,
     "log_filename": null,
     "log_file_mode": "a+",
-    "redis_host_and_port": "192.168.1.3:6379",
+    "redis_host": "192.168.1.3",
+    "redis_port": 6379,
     "celery_tasks_broker": "pyamqp://guest@192.168.1.3//",
     "celery_tasks_backend": null
   }

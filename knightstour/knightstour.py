@@ -5,7 +5,10 @@ import logging
 import functools
 from threading import Timer
 
+import redis
+
 from .simpleunboundcache import simple_unbound_cache
+from knightstour import RedisFIFOSet
 from knightstour import FIFOSet
 import knightstour.celery_tasks
 
@@ -18,7 +21,8 @@ class KnightsTourAlgo:
     """
 
     def __init__(self, board_size, brute_force=False, run_time_checks=True, enable_cache=True, min_negative_path_len=2,
-                 negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3):
+                 negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3,
+                 redis_host="", redis_port=0, redis_password=""):
         self.enable_cache = enable_cache
         self.board_size = board_size
         self.found_walks_count = 0
@@ -26,10 +30,23 @@ class KnightsTourAlgo:
         self.algo_start_time = time.time()
         self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache_size
 
+        # Init Redis Connection
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.redis_password = redis_password
+        self.redis_conn = redis.Redis(host=self.redis_host, port=self.redis_port, password=self.redis_password)
+
         # Evict percent_to_evict % of the cache when the size limit is reached
-        self.negative_outcome_nodes_cache = FIFOSet(maxsize=self.negative_outcome_nodes_max_cache_size,
-                                                    evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0))
-        self.generated_paths_set = set()
+        self.negative_outcome_nodes_cache = RedisFIFOSet(
+            maxsize=self.negative_outcome_nodes_max_cache_size,
+            evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
+            redis_obj=self.redis_conn)
+
+        # self.negative_outcome_nodes_cache = FIFOSet(
+        #     maxsize=self.negative_outcome_nodes_max_cache_size,
+        #     evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0))
+
+        self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
         self.log_cache_info_timer = Timer(5, self.log_cache_info_timer_handle)
@@ -321,6 +338,9 @@ class KnightsTourAlgo:
 
         tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
+        for elm in self.negative_outcome_nodes_cache:
+            logging.debug(elm)
+
         logging.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
         logging.info("*** ALGO END ***".format())
         return tt, tt / (self.found_walks_count or 1)
