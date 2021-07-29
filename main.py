@@ -32,7 +32,11 @@ def main():
                               percent_to_evict=settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE,
                               redis_host=settings.REDIS_HOST,
                               redis_port=settings.REDIS_PORT,
-                              redis_password=settings.REDIS_PASSWORD)
+                              redis_password=settings.REDIS_PASSWORD,
+                              redis_set_key=settings.REDIS_SET_KEY,
+                              redis_ev_list_key=settings.REDIS_EV_LIST_KEY,
+                              redis_hits_key=settings.REDIS_HITS_KEY,
+                              redis_misses_key=settings.REDIS_MISSES_KEY)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

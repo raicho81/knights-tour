@@ -3,31 +3,60 @@ from knightstour import RedisFIFOSet
 import redis
 import random
 
-s = FIFOSet(maxsize=50, evict_count=10)
 
-r = redis.Redis(host='192.168.1.3', port=6379, password='secret', decode_responses=True)
-redis_fifo_set = RedisFIFOSet(maxsize=50,
-                              evict_count=10,
-                              redis_pool_obj=r,
-                              set_key="test_set_1",
-                              ev_list_key="test_set_1_ev_list")
-for _ in redis_fifo_set:
-    print(_)
+def run_test(r):
+    fifo_set = FIFOSet(maxsize=50, evict_count=10)
+    redis_fifo_set = RedisFIFOSet(maxsize=50,
+                                  evict_count=10,
+                                  redis_pool_obj=r,
+                                  redis_set_key="test_set_1",
+                                  redis_ev_list_key="test_set_1_ev_list",
+                                  redis_hits_key="test_hits_key",
+                                  redis_misses_key="test_misses_key")
 
-for _ in range(100):
-    rn = random.randint(0, 1000)
-    s.add(_)
-    redis_fifo_set.add(_)
+    import time
 
-for x in s:
-    if x not in redis_fifo_set:
-        raise RuntimeError("Fuck!")
+    start = time.time()
 
-for xx in redis_fifo_set:
-    if int(xx) not in s:
-        print(xx)
-        print(s)
-        raise RuntimeError("Fuck!X2")
+    to_add = []
+    for _ in range(2000):
+        to_add.append(random.randint(0, 50))
 
-print(s)
-print(redis_fifo_set)
+    for x in to_add:
+        fifo_set.add(x)
+
+    for x in to_add:
+        redis_fifo_set.add(x)
+
+    for x in fifo_set:
+        if x not in redis_fifo_set:
+            raise RuntimeError("Fuck!")
+
+    for xx in redis_fifo_set:
+        if int(xx) not in fifo_set:
+            raise RuntimeError("Fuck!X2")
+
+    tt = time.time() - start
+
+    print("time: {} s".format(tt))
+    # print(fifo_set)
+    # print(redis_fifo_set)
+
+    return tt
+
+
+def main():
+    r = redis.Redis(host='192.168.1.3', port=6379, password='secret', decode_responses=True)
+    print(r.execute_command("CLIENT TRACKING ON"))
+    runtimes = []
+
+    for tr in range(10):
+        runtimes.append(run_test(r))
+
+    import statistics
+    print("Avg. runtime: {}".format(statistics.mean(runtimes)))
+
+
+if __name__ == "__main__":
+    main()
+

@@ -6,6 +6,7 @@ import functools
 from threading import Timer
 
 import redis
+from dynaconf import settings
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
@@ -22,7 +23,9 @@ class KnightsTourAlgo:
 
     def __init__(self, board_size, brute_force=False, run_time_checks=True, enable_cache=True, min_negative_path_len=2,
                  negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3,
-                 redis_host="", redis_port=0, redis_password=""):
+                 redis_host="", redis_port=0, redis_password="", redis_set_key=settings.REDIS_SET_KEY,
+                 redis_ev_list_key=settings.REDIS_EV_LIST_KEY, redis_hits_key=settings.REDIS_HITS_KEY,
+                 redis_misses_key=settings.REDIS_MISSES_KEY):
         self.enable_cache = enable_cache
         self.board_size = board_size
         self.found_walks_count = 0
@@ -34,16 +37,20 @@ class KnightsTourAlgo:
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_password = redis_password
-        self.redis_conn = redis.Redis(host=self.redis_host,
+        self.redis_pool = redis.Redis(host=self.redis_host,
                                       port=self.redis_port,
                                       password=self.redis_password,
                                       decode_responses=True)
-
+        # self.redis_pool.execute_command("CLIENT TRACKING ON")
         # Evict percent_to_evict % of the cache when the size limit is reached
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
             evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
-            redis_pool_obj=self.redis_conn)
+            redis_pool_obj=self.redis_pool,
+            redis_set_key=redis_set_key,
+            redis_ev_list_key=redis_ev_list_key,
+            redis_hits_key=redis_hits_key,
+            redis_misses_key=redis_misses_key)
 
         # self.negative_outcome_nodes_cache = FIFOSet(
         #     maxsize=self.negative_outcome_nodes_max_cache_size,
@@ -52,12 +59,12 @@ class KnightsTourAlgo:
         self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
-        self.log_cache_info_timer = Timer(5, self.log_cache_info_timer_handle)
+        self.log_cache_info_timer = Timer(20, self.log_cache_info_timer_handle)
         self.log_cache_info_timer.setDaemon(True)
 
     def log_cache_info_timer_handle(self):
         self.log_cache_info("Current")
-        self.log_cache_info_timer = Timer(10, self.log_cache_info_timer_handle)
+        self.log_cache_info_timer = Timer(20, self.log_cache_info_timer_handle)
         self.log_cache_info_timer.setDaemon(True)
         self.log_cache_info_timer.start()
 
@@ -198,10 +205,12 @@ class KnightsTourAlgo:
                     "[Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}]"
                         .format(path, node, pms, next_node))
             node = next_node
-        if tuple(path) in self.generated_paths_set:
+
+        path = tuple(path)
+        if path in self.generated_paths_set:
             raise RuntimeError("[Path is already generated! path: {}, node: {}, pms: {}, next_node: {}]"
                                .format(path, node, pms, next_node))
-        self.generated_paths_set.add(tuple(path))
+        self.generated_paths_set.add(path)
 
     def log_cache_info(self, what):
         if not self.enable_cache:
@@ -325,9 +334,11 @@ class KnightsTourAlgo:
         logging.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
         logging.info("[Brute force: {}]".format(self.brute_force))
         logging.info("[Cache enabled: {}]".format(self.enable_cache))
+        logging.info("[Redis: {}]".format(self.redis_host + ":" + str(self.redis_port)))
         logging.info("[Run time checks: {}]".format(self.run_time_checks))
         self.enable_cache and (logging.info("[Min negative path len: {}]".format(self.min_negative_path_len)),
-                               logging.info("[Negative outcome nodes max cache size: {}]".format(self.negative_outcome_nodes_max_cache_size)))
+                               logging.info("[Negative outcome nodes max cache size: {}]".format(
+                                   self.negative_outcome_nodes_max_cache_size)))
         logging.info("[*** ALGO PARAMETERS END ***]")
         self.enable_cache and (logging.info("[Clearing caches]"),
                                self.find_possible_moves_cached.cache_clear(),

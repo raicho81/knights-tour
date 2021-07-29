@@ -5,14 +5,18 @@
     "enable_cache": true,
     "neg_outcomes_cache_size": 50000000,
     "percent_to_evict_from_neg_nodes_cache": 5,
-    "min_neg_path_length": 3,
+    "min_neg_path_length": 2,
     "run_time_checks": false,
     "brute_force": true,
     "log_filename": null,
     "log_file_mode": "a+",
     "redis_host": "192.168.1.3",
     "redis_port": 6379,
+    "redis_set_key": "knights_tour_negative_outcomes_set_cache",
+    "redis_ev_list_key": "knights_tour_negative_outcomes_evict_list",
+    "redis_hits_key": "knights_tour_negative_outcomes_set_cache_hits",
+    "redis_misses_key": "knights_tour_negative_outcomes_set_cache_misses",
     "celery_tasks_broker": "pyamqp://guest@192.168.1.3//",
-    "celery_tasks_backend": null
+    "celery_tasks_backend": "rpc://"
   }
 }
