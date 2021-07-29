@@ -108,7 +108,7 @@ class RedisFIFOSet:
                 except Exception as e:
                     logging.error(e)
         else:
-            self.incr(self.__hits_key)
+            self.r.incr(self.__hits_key)
 
     @property
     def maxsize(self):
