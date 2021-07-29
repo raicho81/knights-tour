@@ -34,13 +34,16 @@ class KnightsTourAlgo:
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_password = redis_password
-        self.redis_conn = redis.Redis(host=self.redis_host, port=self.redis_port, password=self.redis_password)
+        self.redis_conn = redis.Redis(host=self.redis_host,
+                                      port=self.redis_port,
+                                      password=self.redis_password,
+                                      decode_responses=True)
 
         # Evict percent_to_evict % of the cache when the size limit is reached
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
             evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
-            redis_obj=self.redis_conn)
+            redis_pool_obj=self.redis_conn)
 
         # self.negative_outcome_nodes_cache = FIFOSet(
         #     maxsize=self.negative_outcome_nodes_max_cache_size,
@@ -65,7 +68,7 @@ class KnightsTourAlgo:
         self.enable_cache and (self.negative_outcome_nodes_cache.clear(), self.find_possible_moves_helper.cache_clear())
 
     def negative_outcomes_cache_size(self):
-        return self.negative_outcome_nodes_cache.currsize
+        return len(self.negative_outcome_nodes_cache)
 
     @staticmethod
     def seconds_to_str(t):

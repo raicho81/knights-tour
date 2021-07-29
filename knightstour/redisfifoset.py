@@ -1,8 +1,31 @@
 import redis
 import logging
 
-KTNOS = "knights_tour_negative_outcomes_set_cache"
-KTNOEL = "knights_tour_negative_outcomes_evict_list"
+
+KTNOS_KEY = "knights_tour_negative_outcomes_set_cache"
+KTNOEL_KEY = "knights_tour_negative_outcomes_evict_list"
+HITS_KEY = "knights_tour_negative_outcomes_set_cache_hits"
+MISSES_KEY = "knights_tour_negative_outcomes_set_cache_misses"
+
+
+class RedisFIFOSetIterator:
+
+    def __init__(self, fifoset_ev_list, r):
+        self.pos = 0
+        self.evict_list_key = fifoset_ev_list
+        self.r = r
+        self.len = self.r.llen(self.evict_list_key)
+
+    def __next__(self):
+        while self.pos < self.len:
+            ret = self.r.lindex(self.evict_list_key, self.pos)
+            self.pos += 1
+            return ret
+
+        raise StopIteration
+
+    def __iter__(self):
+        return RedisFIFOSetIterator(self.evict_list_key, self.r)
 
 
 class RedisFIFOSet:
@@ -13,64 +36,79 @@ class RedisFIFOSet:
         If maxsize is None the set behaves like an ordinary set(). Stored in Redis.
     """
 
-    def __init__(self, maxsize=None, evict_count=1000, redis_obj=redis.Redis()):
+    def __init__(self, maxsize=None, evict_count=1000, redis_pool_obj=None, set_key=KTNOS_KEY, ev_list_key=KTNOEL_KEY,
+                 hits_key=HITS_KEY, misses_key=MISSES_KEY):
+        self.__hits_key = hits_key
+        self.__misses_key = misses_key
         self.__maxsize = maxsize
-        self.__currsize = 0
         self.__evict_count = evict_count
-        self.__hits = 0
-        self.__misses = 0
-        self.__set = KTNOS
-        self.__set_evict_list = KTNOEL
-        self.r = redis_obj
+        self.__set_key = set_key
+        self.__set_evict_list_key = ev_list_key
+        self.r = redis_pool_obj
         if not self.r:
-            raise ValueError("Invalid Redis connection!")
-        self.delete_redis_structures()
+            raise ValueError("Redis connection pool object is None!")
+        self.clean_redis_structures()
 
-    def delete_redis_structures(self):
-        logging.debug(self.r.delete(self.__set, self.__set_evict_list))
+    def clean_redis_structures(self):
+        self.r.delete(self.__set_key, self.__set_evict_list_key, self.__hits_key, self.__misses_key)
+        self.r.set(self.__hits_key, 0)
+        self.r.set(self.__misses_key, 0)
+
+    def __repr__(self):
+        return "{} ({}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
+            self.__class__.__name__,
+            self.r.sscan(self.__set_key)[1],
+            self.__maxsize,
+            self.currsize,
+            self.hits,
+            self.misses,
+            self.__evict_count
+        )
 
     def __contains__(self, key):
-        ret = self.r.sismember(self.__set, key)
-        # logging.debug("__contains__, key: {} = {}".format(key, ret))
+        ret = self.r.sismember(self.__set_key, key)
+
         if ret:
-            self.__hits += 1
+            self.r.incr(self.__hits_key)
         else:
-            self.__misses += 1
+            self.r.incr(self.__misses_key)
         return ret
 
     def __iter__(self):
-        return iter(self.r.sscan(self.__set, 0))
+        return RedisFIFOSetIterator(self.__set_evict_list_key, self.r)
 
     def __len__(self):
-        return self.r.scard(self.__set)
+        return self.r.scard(self.__set_key)
 
     def add(self, key):
-        if self.__maxsize and (self.__currsize + self.getsizeof(key)) > self.__maxsize:
+        currsize = len(self)
 
-            how_much_to_evict = min(self.__evict_count, self.__currsize)
+        if self.__maxsize and (currsize + self.getsizeof(key)) > self.__maxsize:
+            how_much_to_evict = min(self.__evict_count, currsize)
             to_evict = []
 
             with self.r.pipeline(transaction=True) as p:
                 for _ in range(how_much_to_evict):
-                    to_evict.append(self.r.rpop(self.__set_evict_list))
+                    to_evict.append(self.r.rpop(self.__set_evict_list_key))
 
                 for elm_to_evict in to_evict:
-                    self.r.srem(self.__set, elm_to_evict)
+                    self.r.srem(self.__set_key, elm_to_evict)
                 try:
                     p.execute()
-                    self.__currsize -= len(to_evict)
                 except Exception as e:
                     logging.error(e)
 
-        if not self.r.sismember(self.__set, key):
+        if not self.r.sismember(self.__set_key, key):
             with self.r.pipeline(transaction=True) as p:
-                p.lpush(self.__set_evict_list, key)
-                p.sadd(self.__set, key)
+                p.lpush(self.__set_evict_list_key, key)
+                p.sadd(self.__set_key, key)
+                p.incr(self.__misses_key)
                 try:
                     p.execute()
-                    self.__currsize += self.getsizeof(key)
                 except Exception as e:
                     logging.error(e)
+        else:
+            self.incr(self.__hits_key)
 
     @property
     def maxsize(self):
@@ -80,7 +118,7 @@ class RedisFIFOSet:
     @property
     def currsize(self):
         """The current size of the cache."""
-        return self.__currsize
+        return len(self)
 
     @staticmethod
     def getsizeof(value):
@@ -90,24 +128,21 @@ class RedisFIFOSet:
     @property
     def hits(self):
         """Return the # of hits."""
-        return self.__hits
+        return int(self.r.get(self.__hits_key))
 
     @property
     def misses(self):
         """Return the # of misses"""
-        return self.__misses
+        return int(self.r.get(self.__misses_key)) or 1
 
     @property
     def cache_info(self):
-        return f"RedisFIFOSet Cache Info : [Hit Rate %: {100 * self.__hits / (self.__misses or 1)}, Hits: {self.__hits}," \
-               f"Misses: {self.__misses}, Size: {self.__currsize}]"
+        return f"RedisFIFOSet Cache Info : [Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
+               f"Misses: {self.misses}, Size: {self.currsize}]"
 
     def cache_clear(self):
         """
             Clear FIFOSet data
         """
-        self.delete_redis_structures()
-        self.__currsize = 0
-        self.__hits = 0
-        self.__misses = 0
+        self.clean_redis_structures()
         logging.info("[Redis FIFOSet cache cleared]")

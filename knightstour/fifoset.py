@@ -21,7 +21,7 @@ class FIFOSet:
         self.__set_first_added = collections.deque()
 
     def __repr__(self):
-        return "{}({}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
+        return "{}\t\t\t({}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
             self.__class__.__name__,
             self.__set.__repr__(),
             self.__maxsize,
