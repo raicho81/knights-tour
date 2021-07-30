@@ -41,8 +41,8 @@ class KnightsTourAlgo:
                                       port=self.redis_port,
                                       password=self.redis_password,
                                       decode_responses=True)
-        # self.redis_pool.execute_command("CLIENT TRACKING ON")
-        # Evict percent_to_evict % of the cache when the size limit is reached
+        # self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
+
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
             evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
@@ -51,6 +51,8 @@ class KnightsTourAlgo:
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
             redis_misses_key=redis_misses_key)
+
+        self.negative_outcome_nodes_cache.clean_redis_structures()
 
         # self.negative_outcome_nodes_cache = FIFOSet(
         #     maxsize=self.negative_outcome_nodes_max_cache_size,
@@ -185,10 +187,9 @@ class KnightsTourAlgo:
 
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):   # This is going to Celery and will be working with the Redis cache instead of local cache
         mtx_ctx = self.compute_mtx_ctx(dead_end_path)   # Compute in Celery
-        self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add in Redis SET
+        self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add in Redis
 
     def compute_mtx_ctx(self, path):    # Move to Celery
-        # mtx_ctx = self.make_node_mtx_ctx(path)
         mtx_ctx = knightstour.celery_tasks.make_node_mtx_ctx(path, self.board_size)
         return mtx_ctx
 
@@ -329,6 +330,60 @@ class KnightsTourAlgo:
 
             self.find_walks([pm[0]], pm[1])
 
+    def find_walks_celery_task(self, current_path, possible_moves):
+        current_new_paths_pms = []
+
+        for possible_move in possible_moves:
+            current_path.append(possible_move)
+
+            if self.check_if_path_found(current_path):
+                current_path.pop()
+                continue
+
+            self.find_new_pms_and_dead_ends(current_path, current_new_paths_pms)
+            current_path.pop()
+
+        if not current_new_paths_pms:
+            return
+
+        if not self.brute_force:
+            current_new_paths_pms = sorted(current_new_paths_pms, key=lambda x: len(x[1]))
+            if current_new_paths_pms:
+                cur_min_pms_len = len(current_new_paths_pms[0][1])
+
+        for new_path_possible_moves in current_new_paths_pms:
+            # Skip nodes with more possible outcomes than the first node in the sorted list
+            if not self.brute_force and len(new_path_possible_moves[1]) > cur_min_pms_len:
+                break
+
+            current_path.append(new_path_possible_moves[0])
+            self.find_walks_celery_task(current_path, new_path_possible_moves[1])
+
+    def bootstrap_search_celery(self):
+        logging.info("[Start search with Celery Tasks]")
+
+        for x_coord in range(self.board_size):
+            for y_coord in range(self.board_size):
+                start_node = (x_coord, y_coord)
+                start_path = [start_node]
+                pms = self.find_possible_moves(start_node, start_path)
+                sp = [start_path]
+                self.redis_pool.sadd("possible_moves", sp , pms)
+                print(start_path, pms)
+
+        if not self.brute_force:
+            possible_moves = sorted(possible_moves, key=lambda x: len(x[1]))
+            if possible_moves:
+                possible_move_min_len = len(possible_moves[0][1])
+
+        for pm in possible_moves:
+            if not self.brute_force and len(possible_moves[0][1]) > possible_move_min_len:
+                break
+
+            # create Celery tasks
+
+            # self.find_walks_celery_task([pm[0]], pm[1])
+
     def run(self):
         logging.info("[*** ALGO PARAMETERS START ***]")
         logging.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
@@ -347,13 +402,14 @@ class KnightsTourAlgo:
 
         self.log_cache_info_timer.start()
         self.bootstrap_search()
+        # self.bootstrap_search_celery()
         self.log_cache_info_timer.cancel()
         self.log_cache_info_timer = None
 
         tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
-        for elm in self.negative_outcome_nodes_cache:
-            logging.debug(elm)
+        # for elm in self.negative_outcome_nodes_cache:
+        #     logging.debug(elm)
 
         logging.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
         logging.info("*** ALGO END ***".format())

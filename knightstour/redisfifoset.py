@@ -17,8 +17,8 @@ class RedisFIFOSetIterator:
 
         raise StopIteration
 
-    # def __iter__(self):
-    #     return RedisFIFOSetIterator(self.evict_list_key, self.r)
+    def __iter__(self):
+        return RedisFIFOSetIterator(self.evict_list_key, self.r)
 
 
 class RedisFIFOSet:
@@ -26,11 +26,12 @@ class RedisFIFOSet:
         Class representing a set, which can be bound in size. When the maximum size is reached the first
         elements added equal to evict_count are removed to make place for new ones or if the elements are less than
         evict_count then only the available are evicted resulting in an empty set.
-        If maxsize is None the set behaves like an ordinary set(). Stored in Redis.
+        If maxsize is None the set behaves like an ordinary set() with the extra load of
+        a FIFO list for the SET keys Stored in Redis.
     """
 
     def __init__(self, maxsize=None, evict_count=1000, redis_pool_obj=None, redis_set_key=None, redis_ev_list_key=None,
-                 redis_hits_key=None, redis_misses_key=None):
+                 redis_hits_key=None, redis_misses_key=None, cache_slots_count=4):
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
         self.__maxsize = maxsize
@@ -38,13 +39,19 @@ class RedisFIFOSet:
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
         self.r = redis_pool_obj
+        self.cache_slots_count = cache_slots_count
+        self.current_cache_slot_n = -1
+        self.current_slot_local_cpy = {}
         if not self.r:
             raise ValueError("Redis connection pool object is None!")
         self.clean_redis_structures()
 
     def clean_redis_structures(self):
         p = self.r.pipeline(transaction=True)
-        p.delete(self.__set_key, self.__set_evict_list_key, self.__hits_key, self.__misses_key)
+        p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key)
+        for sn in range(0, self.cache_slots_count):
+            slot = "{}_slot_{}".format(self.__set_key, sn)
+            p.delete(slot)
         p.set(self.__hits_key, 0)
         p.set(self.__misses_key, 0)
         p.execute()
@@ -61,7 +68,16 @@ class RedisFIFOSet:
         )
 
     def __contains__(self, key):
-        ret = self.r.sismember(self.__set_key, key)
+        slot_n = key % self.cache_slots_count
+
+        if slot_n != self.current_cache_slot_n:
+            self.current_cache_slot_n = slot_n
+            slot = "{}_slot_{}".format(self.__set_key, self.current_cache_slot_n)
+            slot_content_iter = self.r.sscan_iter(slot)
+            self.current_slot_local_cpy = set(slot_content_iter)
+            logging.info("Loaded cache slot: {} into self.current_slot_local_cpy".format(slot))
+
+        ret = str(key) in self.current_slot_local_cpy
 
         if ret:
             self.r.incr(self.__hits_key)
@@ -70,36 +86,44 @@ class RedisFIFOSet:
 
         return ret
 
-    def __iter__(self):
-        return RedisFIFOSetIterator(self.__set_evict_list_key, self.r)
+    # def __iter__(self):
+    #     return RedisFIFOSetIterator(self.__set_evict_list_key, self.r)
 
     def __len__(self):
-        return self.r.scard(self.__set_key)
+        return self.r.llen(self.__set_evict_list_key)
 
     def add(self, key):
         currsize = self.currsize
 
         if self.__maxsize and (currsize + self.getsizeof(key)) > self.__maxsize:
             how_much_to_evict = min(self.__evict_count, currsize)
-            to_evict = []
+            llen = self.r.llen(self.__set_evict_list_key)
+            to_evict = self.r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
 
             with self.r.pipeline(transaction=True) as p:
-                for _ in range(how_much_to_evict):
-                    to_evict.append(self.r.rpop(self.__set_evict_list_key))
-
                 for elm_to_evict in to_evict:
-                    self.r.srem(self.__set_key, elm_to_evict)
+                    slot_n = elm_to_evict % self.cache_slots_count
+                    slot = "{}_slot_{}".format(self.__set_key, slot_n)
+                    if self.current_cache_slot_n == slot_n:
+                        self.current_slot_local_cpy.pop(key)
+                    self.r.srem(slot, elm_to_evict)
+                    self.r.lpop(self.__set_evict_list_key)
                 try:
                     p.execute()
                 except Exception as e:
                     logging.error(e)
 
-        if not key in self:
+        is_key_present = key in self
+        if not is_key_present:
             with self.r.pipeline(transaction=True) as p:
+                slot_n = key % self.cache_slots_count
+                slot = "{}_slot_{}".format(self.__set_key, slot_n)
+                p.sadd(slot, key)
                 p.lpush(self.__set_evict_list_key, key)
-                p.sadd(self.__set_key, key)
                 try:
                     p.execute()
+                    if slot_n == self.current_cache_slot_n:
+                        self.current_slot_local_cpy.add(str(key))
                 except Exception as e:
                     logging.error(e)
 
@@ -130,7 +154,8 @@ class RedisFIFOSet:
 
     @property
     def cache_info(self):
-        return f"RedisFIFOSet Cache Info : [Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
+        return f"RedisFIFOSet Cache Info : [" \
+               f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
                f"Misses: {self.misses}, Size: {self.currsize}]"
 
     def cache_clear(self):
