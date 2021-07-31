@@ -54,6 +54,14 @@ class FIFOSet:
         size = sys.getsizeof(self.__set) + sys.getsizeof(self.__set_first_added)
         return size
 
+    def __delitem__(self, key):
+        try:
+            index = self.__set_first_added.index(key)
+            del self.__set_first_added[index]
+            del self.__set[key]
+        except IndexError as e:
+            logging.error(e)    
+
     def add(self, key):
         if self.__maxsize and (self.__currsize + self.getsizeof(key)) > self.__maxsize:
             for _ in range(min(self.__evict_count, self.__currsize)):
