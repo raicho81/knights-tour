@@ -66,6 +66,16 @@ class FIFOSet:
             self.__set.add(key)
             self.__currsize += self.getsizeof(key)
 
+    def pop(self, key):
+        try:
+            index = self.__set_first_added.index(key)
+            self.__set_first_added.remove(index)
+            self.__set.remove(key)
+        except IndexError as e:
+            logging.error(e)
+        
+        return key
+
     @property
     def maxsize(self):
         """The maximum size of the cache."""
@@ -94,7 +104,8 @@ class FIFOSet:
 
     @property
     def cache_info(self):
-        return f"FIFOSet Cache Info : [Hit Rate %: {100 * self.__hits / (self.__misses or 1)}, Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}]"
+        return f"{self.__class__.__name__} Cache Info : [Hit Rate %: {100 * self.__hits / (self.__misses or 1)}, "\
+        f"Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}]"
 
     def cache_clear(self):
         """

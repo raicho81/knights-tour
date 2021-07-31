@@ -1,6 +1,7 @@
 import cachetools.func
 import logging
 import redis
+from knightstour import FIFOSet
 
 
 class RedisFIFOSet:
@@ -12,8 +13,16 @@ class RedisFIFOSet:
         a FIFO list for the SET keys Stored in Redis.
     """
 
-    def __init__(self, maxsize=None, evict_count=1000, redis_pool_obj=redis.Redis(), redis_set_key=None,
-                 redis_ev_list_key=None, redis_hits_key=None, redis_misses_key=None):
+    def __init__(self, maxsize=None,
+                evict_count=1000,
+                redis_pool_obj=redis.Redis(),
+                redis_set_key=None,
+                redis_ev_list_key=None,
+                redis_hits_key=None,
+                redis_misses_key=None,
+                negative_outcome_nodes_max_local_cache_size=1000000,
+                negative_outcome_nodes_local_evict_count=1000):
+
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
         self.__maxsize = maxsize
@@ -21,8 +30,13 @@ class RedisFIFOSet:
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
         self.__r = redis_pool_obj
+        
         self.clean_redis_structures()
 
+        self.negative_outcome_nodes_max_local_cache_size = negative_outcome_nodes_max_local_cache_size
+        self.negative_outcome_nodes_local_evict_count = negative_outcome_nodes_local_evict_count
+        self.negative_outcome_nodes_cache_local = FIFOSet(maxsize=self.negative_outcome_nodes_max_local_cache_size,
+                                                          evict_count=self.negative_outcome_nodes_local_evict_count)
 
     def clean_redis_structures(self):
         p = self.__r.pipeline(transaction=True)
@@ -46,10 +60,13 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    # @cachetools.func.lru_cache(maxsize=131112)
+    @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
+        if key in self.negative_outcome_nodes_cache_local:
+            return key
+        self.negative_outcome_nodes_cache_local.add(key)
+
         ret = bool(self.__r.sismember(self.__set_key, key))
-        
         if ret:
             self.__r.incr(self.__hits_key)
         else:
@@ -86,6 +103,7 @@ class RedisFIFOSet:
                 self.__r.srem(self.__set_key, elm_to_evict)
                 self.__r.rpop(self.__set_evict_list_key)
                 self.__contains__.del_(key)
+                self.__contains__.pop(key)
             try:
                 p.execute()
             except BrokenPipeError as e:
@@ -135,13 +153,13 @@ class RedisFIFOSet:
     def cache_info(self):
         return f"RedisFIFOSet Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
-               f"Misses: {self.misses}, Size: {self.currsize}]\n" \
-               f"__contains__ cache info: {self.__contains__.cache_info()}"
+               f"Misses: {self.misses}, Size: {self.currsize}]"\
+               f"Local cache info: {self.negative_outcome_nodes_cache_local.cache_info}"
 
     def cache_clear(self):
         """
             Clear FIFOSet data
         """
         self.clean_redis_structures()
-        self.__contains__.cache_clear()
+        # self.__contains__.cache_clear()
         logging.info("[{} cache cleared]".format(self.__class__.__name__))
