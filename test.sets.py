@@ -19,13 +19,16 @@ def run_test(r):
     start = time.time()
     to_add = []
     for _ in range(2000):
-        to_add.append(_)
+        to_add.append(random.randint(1, 2000))
 
     for x in to_add:
         fifo_set.add(x)
 
     for x in to_add:
         redis_fifo_set.add(x)
+
+    print(fifo_set)
+    print(redis_fifo_set)
 
     for x in fifo_set:
         if str(x) not in redis_fifo_set:

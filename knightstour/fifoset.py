@@ -32,7 +32,11 @@ class FIFOSet:
         )
 
     def __contains__(self, key):
+        if not isinstance(key, int):
+            key = int(key)
+        
         ret = key in self.__set
+        
         if ret:
             self.__hits += 1
         else:
@@ -41,7 +45,7 @@ class FIFOSet:
         return ret
 
     def __iter__(self):
-        return iter(self.__set_first_added)
+        return iter(self.__set)
 
     def __len__(self):
         return len(self.__set)

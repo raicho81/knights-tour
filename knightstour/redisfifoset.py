@@ -33,9 +33,13 @@ class RedisFIFOSet:
         p.execute()
 
     def __repr__(self):
-        return "{} ({}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
+        s = [key for key in self]
+        l = self.__r.lrange(self.__set_evict_list_key, 0, -1)
+        
+        return "{} (set: {}, list: {}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
             self.__class__.__name__,
-            [key for key in self],
+            s,
+            l,
             self.__maxsize,
             self.currsize,
             self.hits,
@@ -45,16 +49,21 @@ class RedisFIFOSet:
 
     @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
-        ret = self.__r.sismember(self.__set_key, str(key))
+        if not isinstance(key, str):
+            key = str(key)
+
+        ret = self.__r.sismember(self.__set_key, key)
+        
         if ret:
             self.__r.incr(self.__hits_key)
         else:
             self.__r.incr(self.__misses_key)
 
+        
         return ret
 
     def __iter__(self):
-        return iter(self.__r.lrange(self.__set_evict_list_key, 0, -1))
+        return iter(self.__r.sscan_iter(self.__set_key))
 
     def __len__(self):
         return self.__r.llen(self.__set_evict_list_key)
@@ -76,8 +85,7 @@ class RedisFIFOSet:
                 except BrokenPipeError as e:
                     logging.error(e)
 
-        is_key_present = key in self
-        if not is_key_present:
+        if not key in self:
             with self.__r.pipeline(transaction=True) as p:
                 p.sadd(self.__set_key, key)
                 p.lpush(self.__set_evict_list_key, key)
