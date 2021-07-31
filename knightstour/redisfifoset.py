@@ -54,8 +54,8 @@ class RedisFIFOSet:
             self.__r.incr(self.__hits_key)
         else:
             self.__r.incr(self.__misses_key)
-            self.__evict(self, key)
-            
+            self.__evict(key)
+
             with self.__r.pipeline(transaction=True) as p:
                 p.sadd(self.__set_key, key)
                 p.lpush(self.__set_evict_list_key, key)
