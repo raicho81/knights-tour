@@ -36,7 +36,8 @@ def main():
                               redis_set_key=settings.REDIS_SET_KEY,
                               redis_ev_list_key=settings.REDIS_EV_LIST_KEY,
                               redis_hits_key=settings.REDIS_HITS_KEY,
-                              redis_misses_key=settings.REDIS_MISSES_KEY)
+                              redis_misses_key=settings.REDIS_MISSES_KEY,
+                              log_cache_info_timer_timeout=settings.LOG_CACHE_INFO_TIMER_TIMEOUT)
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)

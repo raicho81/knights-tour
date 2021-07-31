@@ -111,7 +111,6 @@ class FIFOSet:
 
         return self.__misses
 
-    @property
     def cache_info(self):
         return f"{self.__class__.__name__} Cache Info : [Hit Rate %: {100 * self.__hits / (self.__misses or 1)}, "\
         f"Hits: {self.__hits}, Misses: {self.__misses}, Size: {len(self.__set)}, Max Size: {self.maxsize}]"

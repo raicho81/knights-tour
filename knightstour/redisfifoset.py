@@ -148,7 +148,7 @@ class RedisFIFOSet:
         return f"{self.__class__.__name__} Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
                f"Misses: {self.misses}, Size: {self.currsize}]\n"\
-               f"[Local cache info: {self.negative_outcome_nodes_cache_local.cache_info}]"
+               f"[Local cache info: {self.negative_outcome_nodes_cache_local.cache_info()}]"
 
     def cache_clear(self):
         """

@@ -42,7 +42,8 @@ class KnightsTourAlgo:
                                       port=self.redis_port,
                                       password=self.redis_password,
                                       decode_responses=True)
-        # self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
+
+        self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
         self.negative_outcome_nodes_max_local_cache_size = negative_outcome_nodes_max_local_cache_size
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
@@ -52,19 +53,20 @@ class KnightsTourAlgo:
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
             redis_misses_key=redis_misses_key,
-            negative_outcome_nodes_max_local_cache_size=negative_outcome_nodes_max_local_cache_size)
+            negative_outcome_nodes_max_local_cache_size=negative_outcome_nodes_max_local_cache_size,
+            log_cache_info_timer_timeout=60)
 
         # self.negative_outcome_nodes_cache.clean_redis_structures()
 
         self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
-        self.log_cache_info_timer = Timer(20, self.log_cache_info_timer_handle)
+        self.log_cache_info_timer = Timer(self.log_cache_info_timer_timeout, self.log_cache_info_timer_handle)
         self.log_cache_info_timer.setDaemon(True)
 
     def log_cache_info_timer_handle(self):
         self.log_cache_info("Current")
-        self.log_cache_info_timer = Timer(20, self.log_cache_info_timer_handle)
+        self.log_cache_info_timer = Timer(self.log_cache_info_timer_timeout, self.log_cache_info_timer_handle)
         self.log_cache_info_timer.setDaemon(True)
         self.log_cache_info_timer.start()
 
@@ -219,7 +221,7 @@ class KnightsTourAlgo:
             what,
             self.negative_outcome_nodes_cache.cache_info))
 
-        logging.info("[{} self.find_possible_moves_helper Info: {}]".format(
+        logging.info("\n[{} self.find_possible_moves_helper Info: {}]".format(
             what,
             self.find_possible_moves_cached.cache_info()))
 
