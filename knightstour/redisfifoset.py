@@ -1,26 +1,6 @@
 import logging
 
 
-class RedisFIFOSetIterator:
-
-    def __init__(self, fifoset_ev_list, r):
-        self.pos = 0
-        self.evict_list_key = fifoset_ev_list
-        self.r = r
-        self.len = self.r.llen(self.evict_list_key)
-
-    def __next__(self):
-        while self.pos < self.len:
-            ret = self.r.lindex(self.evict_list_key, self.pos)
-            self.pos += 1
-            return ret
-
-        raise StopIteration
-
-    def __iter__(self):
-        return RedisFIFOSetIterator(self.evict_list_key, self.r)
-
-
 class RedisFIFOSet:
     """
         Class representing a set, which can be bound in size. When the maximum size is reached the first
@@ -31,7 +11,7 @@ class RedisFIFOSet:
     """
 
     def __init__(self, maxsize=None, evict_count=1000, redis_pool_obj=None, redis_set_key=None, redis_ev_list_key=None,
-                 redis_hits_key=None, redis_misses_key=None, cache_slots_count=4):
+                 redis_hits_key=None, redis_misses_key=None, cache_slots_count=2):
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
         self.__maxsize = maxsize
@@ -86,8 +66,8 @@ class RedisFIFOSet:
 
         return ret
 
-    # def __iter__(self):
-    #     return RedisFIFOSetIterator(self.__set_evict_list_key, self.r)
+    def __iter__(self):
+        return self.r.lrange(self.__set_evict_list_key, 0, -1)
 
     def __len__(self):
         return self.r.llen(self.__set_evict_list_key)
@@ -110,7 +90,7 @@ class RedisFIFOSet:
                     self.r.lpop(self.__set_evict_list_key)
                 try:
                     p.execute()
-                except Exception as e:
+                except BrokenPipeError as e:
                     logging.error(e)
 
         is_key_present = key in self
@@ -124,7 +104,7 @@ class RedisFIFOSet:
                     p.execute()
                     if slot_n == self.current_cache_slot_n:
                         self.current_slot_local_cpy.add(str(key))
-                except Exception as e:
+                except BrokenPipeError as e:
                     logging.error(e)
 
     @property

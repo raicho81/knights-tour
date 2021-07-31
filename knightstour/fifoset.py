@@ -41,7 +41,7 @@ class FIFOSet:
         return ret
 
     def __iter__(self):
-        return iter(self.__set)
+        return iter(self.__set_first_added)
 
     def __len__(self):
         return len(self.__set)

@@ -37,10 +37,7 @@ def run_test(r):
             raise RuntimeError("Fuck!X2")
 
     tt = time.time() - start
-
     print("time: {} s".format(tt))
-    # print(fifo_set)
-    # print(redis_fifo_set)
 
     return tt
 
