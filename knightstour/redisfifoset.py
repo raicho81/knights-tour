@@ -60,7 +60,7 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    @cachetools.func.lru_cache(maxsize=131112)
+    # @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
         if key in self.negative_outcome_nodes_cache_local:
             return key
@@ -102,7 +102,7 @@ class RedisFIFOSet:
             for elm_to_evict in to_evict:
                 self.__r.srem(self.__set_key, elm_to_evict)
                 self.__r.rpop(self.__set_evict_list_key)
-                self.__contains__.del_(key)
+                # self.__contains__.del_(key)
                 self.__contains__.pop(key)
             try:
                 p.execute()
@@ -151,10 +151,10 @@ class RedisFIFOSet:
 
     @property
     def cache_info(self):
-        return f"RedisFIFOSet Cache Info : [" \
+        return f"{self.__class__.__name__} Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
-               f"Misses: {self.misses}, Size: {self.currsize}]"\
-               f"Local cache info: {self.negative_outcome_nodes_cache_local.cache_info}"
+               f"Misses: {self.misses}, Size: {self.currsize}]\n"\
+               f"[Local cache info: {self.negative_outcome_nodes_cache_local.cache_info}]"
 
     def cache_clear(self):
         """
@@ -162,4 +162,5 @@ class RedisFIFOSet:
         """
         self.clean_redis_structures()
         # self.__contains__.cache_clear()
+        self.negative_outcome_nodes_cache_local.cache_clear()
         logging.info("[{} cache cleared]".format(self.__class__.__name__))

@@ -215,7 +215,7 @@ class KnightsTourAlgo:
         if not self.enable_cache:
             return
 
-        logging.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
+        logging.info("\n[{} self.negative_outcome_nodes_cache Info: {}]".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
 
