@@ -55,6 +55,14 @@ class RedisFIFOSet:
         else:
             self.__r.incr(self.__misses_key)
 
+            with self.__r.pipeline(transaction=True) as p:
+                p.sadd(self.__set_key, key)
+                p.lpush(self.__set_evict_list_key, key)
+                try:
+                    p.execute()
+                except BrokenPipeError as e:
+                    logging.error(e)
+
         return ret
 
     def __iter__(self):
@@ -63,34 +71,39 @@ class RedisFIFOSet:
     def __len__(self):
         return self.__r.llen(self.__set_evict_list_key)
 
-    def add(self, key):
-        currsize = self.currsize
-
-        if self.__maxsize and (currsize + self.getsizeof(key)) > self.__maxsize:
-            how_much_to_evict = min(self.__evict_count, currsize)
-            llen = self.__r.llen(self.__set_evict_list_key)
-            to_evict = self.__r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
-
-            with self.__r.pipeline(transaction=True) as p:
-                for elm_to_evict in to_evict:
-                    self.__r.srem(self.__set_key, elm_to_evict)
-                    self.__r.rpop(self.__set_evict_list_key)
-                    self.__contains__.del_(key)
-                try:
-                    p.execute()
-                except BrokenPipeError as e:
-                    logging.error(e)
+    def __evict(self, key):
+        cursz = self.currsize
+        if self.__maxsize and (cursz + self.getsizeof(key)) < self.__maxsize:
+            return
         
-        # key_in_set = (key in self) Very strange but this with combination with the contents is not
+        how_much_to_evict = min(self.__evict_count, cursz)
+        llen = self.__r.llen(self.__set_evict_list_key)
+        to_evict = self.__r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
 
+        with self.__r.pipeline(transaction=True) as p:
+            for elm_to_evict in to_evict:
+                self.__r.srem(self.__set_key, elm_to_evict)
+                self.__r.rpop(self.__set_evict_list_key)
+                self.__contains__.del_(key)
+            try:
+                p.execute()
+            except BrokenPipeError as e:
+                logging.error(e)
+    
+    
+    def __add(self, key):
+        with self.__r.pipeline(transaction=True) as p:
+            p.sadd(self.__set_key, key)
+            p.lpush(self.__set_evict_list_key, key)
+            try:
+                p.execute()
+            except BrokenPipeError as e:
+                logging.error(e)
+    
+    def add(self, key):
+        self.__evict(key)
         if not bool(self.__r.sismember(self.__set_key, key)):    #   key in self:
-            with self.__r.pipeline(transaction=True) as p:
-                p.sadd(self.__set_key, key)
-                p.lpush(self.__set_evict_list_key, key)
-                try:
-                    p.execute()
-                except BrokenPipeError as e:
-                    logging.error(e)
+            self.__add()
 
     @property
     def maxsize(self):
