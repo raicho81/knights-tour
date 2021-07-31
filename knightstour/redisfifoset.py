@@ -116,6 +116,7 @@ class RedisFIFOSet:
         self.__evict(key)
         if not bool(self.__r.sismember(self.__set_key, key)):
             self.__add(key)
+            self.negative_outcome_nodes_cache_local.add(key)
 
     @property
     def maxsize(self):
