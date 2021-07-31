@@ -311,6 +311,7 @@ class KnightsTourAlgo:
     def bootstrap_search(self):
         logging.info("[Start search]".format(self.found_walks_count))
         possible_moves = []
+        possible_move_min_len = 0
 
         for x_coord in range(self.board_size):
             for y_coord in range(self.board_size):
@@ -361,6 +362,8 @@ class KnightsTourAlgo:
 
     def bootstrap_search_celery(self):
         logging.info("[Start search with Celery Tasks]")
+        possible_moves = []
+        possible_move_min_len = 0
 
         for x_coord in range(self.board_size):
             for y_coord in range(self.board_size):
@@ -368,7 +371,8 @@ class KnightsTourAlgo:
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_node, start_path)
                 sp = [start_path]
-                self.redis_pool.sadd("possible_moves", sp , pms)
+                self.redis_pool.sadd("possible_moves", sp, pms)
+                possible_moves.append(pms)
                 print(start_path, pms)
 
         if not self.brute_force:
@@ -376,7 +380,7 @@ class KnightsTourAlgo:
             if possible_moves:
                 possible_move_min_len = len(possible_moves[0][1])
 
-        for pm in possible_moves:
+        for _ in possible_moves:
             if not self.brute_force and len(possible_moves[0][1]) > possible_move_min_len:
                 break
 

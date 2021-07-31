@@ -1,4 +1,6 @@
 import logging
+from typing import Union, Any
+
 import crc16
 import redis
 import itertools
@@ -10,8 +12,10 @@ class RedisPathsPmsHSet:
         There is also a list with the HSet slots and keys, which is used as a new task queue
     """
 
-    def __init__(self, redis_pool_obj=redis.Redis(), redis_path_pms_hset_key=None, redis_path_pms__list_key=None,
-                 redis_cache_slots_count=64):
+    def __init__(self, redis_path_pms_hset_key,
+                 redis_path_pms__list_key,
+                 redis_pool_obj=redis.Redis(),
+                 redis_cache_slots_count=8):
         self.r = redis_pool_obj
         self.redis_path_pms__list_key = redis_path_pms__list_key
         self.redis_path_pms_hset_key = redis_path_pms_hset_key
@@ -34,16 +38,16 @@ class RedisPathsPmsHSet:
         return "{} ({}, currsize={})".format(
             self.__class__.__name__,
             ["{}: {}".format(k, v) for k, v in itertools.chain(
-                *[self.r.sscan_iter("{}_slot_{}".format(self.redis_path_pms__list_key, sn)).items() for sn in range(0, self.cache_slots_count)]],
+                *[self.r.sscan_iter("{}_slot_{}".format(self.redis_path_pms__list_key, sn)).items() for sn in range(0, self.cache_slots_count)])],
             self.currsize
             )
 
     def __contains__(self, key):
-        slot_n = self.slot_n(bytes(key)) % self.cache_slots_count
+        slot_n: Union[int, Any] = self.slot_n(bytes(key)) % self.cache_slots_count
 
         if slot_n != self.current_cache_slot_n:
             self.current_cache_slot_n = slot_n
-            slot = "{}_slot_{}".format(self.__set_key, self.current_cache_slot_n)
+            slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, self.current_cache_slot_n)
             slot_content_iter = self.r.hscan_iter(slot)
             self.current_slot_local_cpy = dict(slot_content_iter)
             logging.info("Loaded cache slot: {} into self.current_slot_local_cpy".format(slot))
@@ -52,7 +56,8 @@ class RedisPathsPmsHSet:
         return ret
 
     def __iter__(self):
-        return self.r.lrange(self.redis_path_pms__list_key, 0, -1)
+        return itertools.chain(*[self.r.sscan_iter("{}_slot_{}".format(self.redis_path_pms__list_key, sn)).items()
+                                 for sn in range(0, self.cache_slots_count > 0 or 1)])
 
     def __len__(self):
         return self.r.llen(self.redis_path_pms__list_key)

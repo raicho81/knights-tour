@@ -1,5 +1,7 @@
+import functools
 import logging
 import crc16
+import redis
 
 
 class RedisFIFOSet:
@@ -11,8 +13,8 @@ class RedisFIFOSet:
         a FIFO list for the SET keys Stored in Redis.
     """
 
-    def __init__(self, maxsize=None, evict_count=1000, redis_pool_obj=None, redis_set_key=None, redis_ev_list_key=None,
-                 redis_hits_key=None, redis_misses_key=None, cache_slots_count=8):
+    def __init__(self, maxsize=None, evict_count=1000, redis_pool_obj=redis.Redis(), redis_set_key=None,
+                 redis_ev_list_key=None, redis_hits_key=None, redis_misses_key=None):
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
         self.__maxsize = maxsize
@@ -20,19 +22,13 @@ class RedisFIFOSet:
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
         self.r = redis_pool_obj
-        self.cache_slots_count = cache_slots_count
-        self.current_cache_slot_n = -1
-        self.current_slot_local_cpy = set()
         if not self.r:
             raise ValueError("Redis connection pool object is None!")
         self.clean_redis_structures()
 
     def clean_redis_structures(self):
         p = self.r.pipeline(transaction=True)
-        p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key)
-        for sn in range(0, self.cache_slots_count):
-            slot = "{}_slot_{}".format(self.__set_key, sn)
-            p.delete(slot)
+        p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key)
         p.set(self.__hits_key, 0)
         p.set(self.__misses_key, 0)
         p.execute()
@@ -48,18 +44,9 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
+    @functools.lru_cache(maxsize=16384)
     def __contains__(self, key):
-        slot_n = self.slot_n(key)
-
-        if slot_n != self.current_cache_slot_n:
-            self.current_cache_slot_n = slot_n
-            slot = "{}_slot_{}".format(self.__set_key, self.current_cache_slot_n)
-            slot_content_iter = self.r.sscan_iter(slot)
-            self.current_slot_local_cpy = set(slot_content_iter)
-            logging.info("Loaded cache slot: {} into self.current_slot_local_cpy".format(slot))
-
-        ret = str(key) in self.current_slot_local_cpy
-
+        ret = self.r.sismember(self.__set_key, key)
         if ret:
             self.r.incr(self.__hits_key)
         else:
@@ -68,7 +55,7 @@ class RedisFIFOSet:
         return ret
 
     def __iter__(self):
-        return self.r.lrange(self.__set_evict_list_key, 0, -1)
+        return iter(self.r.lrange(self.__set_evict_list_key, 0, -1))
 
     def __len__(self):
         return self.r.llen(self.__set_evict_list_key)
@@ -83,11 +70,7 @@ class RedisFIFOSet:
 
             with self.r.pipeline(transaction=True) as p:
                 for elm_to_evict in to_evict:
-                    slot_n = self.slot_n(elm_to_evict)
-                    slot = "{}_slot_{}".format(self.__set_key, slot_n)
-                    if self.current_cache_slot_n == slot_n:
-                        self.current_slot_local_cpy.pop(key)
-                    self.r.srem(slot, elm_to_evict)
+                    self.r.srem(self.__set_key, elm_to_evict)
                     self.r.lpop(self.__set_evict_list_key)
                 try:
                     p.execute()
@@ -97,21 +80,12 @@ class RedisFIFOSet:
         is_key_present = key in self
         if not is_key_present:
             with self.r.pipeline(transaction=True) as p:
-                slot_n = self.slot_n(key)
-                slot = "{}_slot_{}".format(self.__set_key, slot_n)
-                p.sadd(slot, key)
+                p.sadd(self.__set_key, key)
                 p.lpush(self.__set_evict_list_key, key)
                 try:
                     p.execute()
-                    if slot_n == self.current_cache_slot_n:
-                        self.current_slot_local_cpy.add(str(key))
                 except BrokenPipeError as e:
                     logging.error(e)
-
-    def slot_n(self, key):
-        crc_16 = crc16.crc16xmodem(bytes(key), 0xFFFF)
-        sn = crc_16 % self.cache_slots_count
-        return sn
 
     @property
     def maxsize(self):
@@ -142,7 +116,8 @@ class RedisFIFOSet:
     def cache_info(self):
         return f"RedisFIFOSet Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
-               f"Misses: {self.misses}, Size: {self.currsize}]"
+               f"Misses: {self.misses}, Size: {self.currsize}]\n" \
+               f"__contains__ cache info: {self.__contains__.cache_info()}"
 
     def cache_clear(self):
         """
