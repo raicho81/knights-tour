@@ -36,7 +36,6 @@ class FIFOSet:
             key = int(key)
         
         ret = key in self.__set
-        
         if ret:
             self.__hits += 1
         else:
@@ -59,6 +58,7 @@ class FIFOSet:
             index = self.__set_first_added.index(key)
             del self.__set_first_added[index]
             del self.__set[key]
+            self.__currsize -= self.getsizeof(key)
         except IndexError as e:
             logging.error(e)    
 
@@ -79,6 +79,7 @@ class FIFOSet:
             index = self.__set_first_added.index(key)
             self.__set_first_added.remove(index)
             self.__set.remove(key)
+            self.__currsize -= self.getsizeof(key)
         except IndexError as e:
             logging.error(e)
         
