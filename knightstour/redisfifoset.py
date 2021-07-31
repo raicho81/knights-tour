@@ -114,7 +114,7 @@ class RedisFIFOSet:
     
     def add(self, key):
         self.__evict(key)
-        if not bool(self.__r.sismember(self.__set_key, key)):    #   key in self:
+        if not bool(self.__r.sismember(self.__set_key, key)):
             self.__add(key)
 
     @property
