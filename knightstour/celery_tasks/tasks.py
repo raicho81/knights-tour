@@ -6,7 +6,6 @@ app = Celery('tasks', broker=settings.CELERY_TASKS_BROKER, backend=settings.CELE
 app.conf.task_serializer = 'msgpack'
 app.conf.result_serializer = 'msgpack'
 
-
 def set_bits(value, bits):
     for bit in bits:
         value |= (1 << bit)
