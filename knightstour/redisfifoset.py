@@ -1,6 +1,5 @@
-import functools
+import cachetools.func
 import logging
-import crc16
 import redis
 
 
@@ -21,13 +20,13 @@ class RedisFIFOSet:
         self.__evict_count = evict_count
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
-        self.r = redis_pool_obj
-        if not self.r:
+        self.__r = redis_pool_obj
+        if not self.__r:
             raise ValueError("Redis connection pool object is None!")
         self.clean_redis_structures()
 
     def clean_redis_structures(self):
-        p = self.r.pipeline(transaction=True)
+        p = self.__r.pipeline(transaction=True)
         p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key)
         p.set(self.__hits_key, 0)
         p.set(self.__misses_key, 0)
@@ -44,34 +43,34 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    @functools.lru_cache(maxsize=16384)
+    @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
-        ret = self.r.sismember(self.__set_key, key)
+        ret = self.__r.sismember(self.__set_key, str(key))
         if ret:
-            self.r.incr(self.__hits_key)
+            self.__r.incr(self.__hits_key)
         else:
-            self.r.incr(self.__misses_key)
+            self.__r.incr(self.__misses_key)
 
         return ret
 
     def __iter__(self):
-        return iter(self.r.lrange(self.__set_evict_list_key, 0, -1))
+        return iter(self.__r.lrange(self.__set_evict_list_key, 0, -1))
 
     def __len__(self):
-        return self.r.llen(self.__set_evict_list_key)
+        return self.__r.llen(self.__set_evict_list_key)
 
     def add(self, key):
         currsize = self.currsize
 
         if self.__maxsize and (currsize + self.getsizeof(key)) > self.__maxsize:
             how_much_to_evict = min(self.__evict_count, currsize)
-            llen = self.r.llen(self.__set_evict_list_key)
-            to_evict = self.r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
+            llen = self.__r.llen(self.__set_evict_list_key)
+            to_evict = self.__r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
 
-            with self.r.pipeline(transaction=True) as p:
+            with self.__r.pipeline(transaction=True) as p:
                 for elm_to_evict in to_evict:
-                    self.r.srem(self.__set_key, elm_to_evict)
-                    self.r.lpop(self.__set_evict_list_key)
+                    self.__r.srem(self.__set_key, elm_to_evict)
+                    self.__r.rpop(self.__set_evict_list_key)
                 try:
                     p.execute()
                 except BrokenPipeError as e:
@@ -79,7 +78,7 @@ class RedisFIFOSet:
 
         is_key_present = key in self
         if not is_key_present:
-            with self.r.pipeline(transaction=True) as p:
+            with self.__r.pipeline(transaction=True) as p:
                 p.sadd(self.__set_key, key)
                 p.lpush(self.__set_evict_list_key, key)
                 try:
@@ -105,12 +104,12 @@ class RedisFIFOSet:
     @property
     def hits(self):
         """Return the # of hits."""
-        return int(self.r.get(self.__hits_key))
+        return int(self.__r.get(self.__hits_key))
 
     @property
     def misses(self):
         """Return the # of misses"""
-        return int(self.r.get(self.__misses_key)) or 1
+        return int(self.__r.get(self.__misses_key)) or 1
 
     @property
     def cache_info(self):

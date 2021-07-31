@@ -17,10 +17,9 @@ def run_test(r):
     import time
 
     start = time.time()
-
     to_add = []
     for _ in range(2000):
-        to_add.append(random.randint(0, 50))
+        to_add.append(_)
 
     for x in to_add:
         fifo_set.add(x)
@@ -29,12 +28,12 @@ def run_test(r):
         redis_fifo_set.add(x)
 
     for x in fifo_set:
-        if x not in redis_fifo_set:
-            raise RuntimeError("Fuck!")
+        if str(x) not in redis_fifo_set:
+            raise RuntimeError("{} not in redis_fifo_set!".format(x))
 
     for xx in redis_fifo_set:
         if int(xx) not in fifo_set:
-            raise RuntimeError("Fuck!X2")
+            raise RuntimeError("{} not in fifo_set".format(xx))
 
     tt = time.time() - start
     print("time: {} s".format(tt))
@@ -44,7 +43,7 @@ def run_test(r):
 
 def main():
     r = redis.Redis(host='192.168.1.3', port=6379, password='secret', decode_responses=True)
-    print(r.execute_command("CLIENT TRACKING ON"))
+    # print(r.execute_command("CLIENT TRACKING ON"))
     runtimes = []
 
     for tr in range(10):
