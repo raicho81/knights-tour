@@ -85,7 +85,7 @@ class RedisFIFOSet:
             for elm_to_evict in to_evict:
                 self.__r.srem(self.__set_key, elm_to_evict)
                 self.__r.rpop(self.__set_evict_list_key)
-                # self.__contains__.del_(key)
+                self.__contains__.del_(key)
             try:
                 p.execute()
             except BrokenPipeError as e:
@@ -136,12 +136,12 @@ class RedisFIFOSet:
         return f"RedisFIFOSet Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
                f"Misses: {self.misses}, Size: {self.currsize}]\n" \
-            #    f"__contains__ cache info: {self.__contains__.cache_info()}"
+               f"__contains__ cache info: {self.__contains__.cache_info()}"
 
     def cache_clear(self):
         """
             Clear FIFOSet data
         """
         self.clean_redis_structures()
-        # self.__contains__.cache_clear()
+        self.__contains__.cache_clear()
         logging.info("[{} cache cleared]".format(self.__class__.__name__))
