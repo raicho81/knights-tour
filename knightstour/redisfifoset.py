@@ -46,7 +46,7 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    @cachetools.func.lru_cache(maxsize=131112)
+    # @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
         ret = bool(self.__r.sismember(self.__set_key, key))
         
@@ -54,7 +54,8 @@ class RedisFIFOSet:
             self.__r.incr(self.__hits_key)
         else:
             self.__r.incr(self.__misses_key)
-
+            self.__evict(self, key)
+            
             with self.__r.pipeline(transaction=True) as p:
                 p.sadd(self.__set_key, key)
                 p.lpush(self.__set_evict_list_key, key)
@@ -84,7 +85,7 @@ class RedisFIFOSet:
             for elm_to_evict in to_evict:
                 self.__r.srem(self.__set_key, elm_to_evict)
                 self.__r.rpop(self.__set_evict_list_key)
-                self.__contains__.del_(key)
+                # self.__contains__.del_(key)
             try:
                 p.execute()
             except BrokenPipeError as e:
@@ -103,7 +104,7 @@ class RedisFIFOSet:
     def add(self, key):
         self.__evict(key)
         if not bool(self.__r.sismember(self.__set_key, key)):    #   key in self:
-            self.__add()
+            self.__add(key)
 
     @property
     def maxsize(self):
@@ -135,12 +136,12 @@ class RedisFIFOSet:
         return f"RedisFIFOSet Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
                f"Misses: {self.misses}, Size: {self.currsize}]\n" \
-               f"__contains__ cache info: {self.__contains__.cache_info()}"
+            #    f"__contains__ cache info: {self.__contains__.cache_info()}"
 
     def cache_clear(self):
         """
             Clear FIFOSet data
         """
         self.clean_redis_structures()
-        self.__contains__.cache_clear()
+        # self.__contains__.cache_clear()
         logging.info("[{} cache cleared]".format(self.__class__.__name__))
