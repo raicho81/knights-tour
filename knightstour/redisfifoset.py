@@ -63,7 +63,7 @@ class RedisFIFOSet:
     # @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
         if key in self.negative_outcome_nodes_cache_local:
-            return key
+            return True
         self.negative_outcome_nodes_cache_local.add(key)
 
         ret = bool(self.__r.sismember(self.__set_key, key))
@@ -72,14 +72,7 @@ class RedisFIFOSet:
         else:
             self.__r.incr(self.__misses_key)
             self.__evict(key)
-
-            with self.__r.pipeline(transaction=True) as p:
-                p.sadd(self.__set_key, key)
-                p.lpush(self.__set_evict_list_key, key)
-                try:
-                    p.execute()
-                except BrokenPipeError as e:
-                    logging.error(e)
+            self.add(key)
 
         return ret
 
