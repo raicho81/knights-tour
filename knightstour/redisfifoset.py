@@ -1,7 +1,6 @@
 import cachetools.func
 import logging
 import redis
-import collections
 
 
 class RedisFIFOSet:
@@ -23,7 +22,6 @@ class RedisFIFOSet:
         self.__set_evict_list_key = redis_ev_list_key
         self.__r = redis_pool_obj
         self.clean_redis_structures()
-        self.__local_ev_list =  collections.deque()
 
 
     def clean_redis_structures(self):
@@ -48,7 +46,7 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    # @cachetools.func.lru_cache(maxsize=131112)
+    @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
         # if not isinstance(key, str):
         #     key = str(key)
@@ -80,9 +78,7 @@ class RedisFIFOSet:
                 for elm_to_evict in to_evict:
                     self.__r.srem(self.__set_key, elm_to_evict)
                     self.__r.rpop(self.__set_evict_list_key)
-                    self.__local_ev_list.popleft()
-                    # self.__contains__.pop(elm_to_evict)
-                    
+                    self.__contains__.del_(key)
                 try:
                     p.execute()
                 except BrokenPipeError as e:
@@ -94,9 +90,6 @@ class RedisFIFOSet:
             with self.__r.pipeline(transaction=True) as p:
                 p.sadd(self.__set_key, key)
                 p.lpush(self.__set_evict_list_key, key)
-                if key in self.__local_ev_list:
-                    print("Error! Key: {} is duplicate inthe evict list!".format(key))
-                self.__local_ev_list.append(key)
                 try:
                     p.execute()
                 except BrokenPipeError as e:
@@ -139,5 +132,5 @@ class RedisFIFOSet:
             Clear FIFOSet data
         """
         self.clean_redis_structures()
-        logging.info("[{} cache cleared]".format(self.__class__.__name__))
         self.__contains__.cache_clear()
+        logging.info("[{} cache cleared]".format(self.__class__.__name__))
