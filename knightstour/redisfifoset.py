@@ -27,7 +27,7 @@ class RedisFIFOSet:
         self.__evict_count = evict_count
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
-        self.p = redis_pool_obj
+        self.__r = redis_pool_obj
 
     def clean_redis_structures(self):
         
@@ -36,17 +36,15 @@ class RedisFIFOSet:
             p.set(self.__hits_key, 0)
             p.set(self.__misses_key, 0)
 
-        self.p.transaction(trans_func, *[self.__set_evict_list_key, self.__set_key])
+        self.__r.transaction(trans_func, *[self.__set_evict_list_key, self.__set_key])
 
     def __repr__(self):
         s = [key for key in self]
-        l = None
 
         def trans_func(p):
-            global l
-            l = p.lrange(self.__set_evict_list_key, 0, -1)
+            return p.lrange(self.__set_evict_list_key, 0, -1)
 
-        self.p.transaction(trans_func, *[self.__set_evict_list_key])
+        l = self.__r.transaction(trans_func, *[self.__set_evict_list_key])
         
         return "{} (set: {}, list: {}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
             self.__class__.__name__,
@@ -61,18 +59,16 @@ class RedisFIFOSet:
 
     @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
-        ret = False
 
         def trans_func(p):
-            global ret
             ret = bool(p.sismember(self.__set_key, key))
         
-        self.p.transaction(trans_func, *[self.__set_key])
+        ret = self.__r.transaction(trans_func, *[self.__set_key])
 
         if ret:
-            self.p.incr(self.__hits_key)
+            self.__r.incr(self.__hits_key)
         else:
-            self.p.incr(self.__misses_key)
+            self.__r.incr(self.__misses_key)
             self.__evict(key)
             self.add(key)
         
@@ -80,11 +76,11 @@ class RedisFIFOSet:
 
     def __iter__(self):
         # TODO: Do I need Transaction here? I am not sure yet.
-        return  iter(self.p.sscan_iter(self.__set_key))
+        return  iter(self.__r.sscan_iter(self.__set_key))
 
     def __len__(self):
         # TODO: Do I need Transaction here? I am not sure yet.
-        return self.p.llen(self.__set_evict_list_key)
+        return self.__r.llen(self.__set_evict_list_key)
     
     def __evict(self, key):
         cursz = self.currsize
@@ -101,24 +97,22 @@ class RedisFIFOSet:
                 p.rpop(self.__set_evict_list_key)
                 self.__contains__.pop(key)
 
-        self.p.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
+        self.__r.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
 
     def __add(self, key):
         def trans_func(p):
             p.sadd(self.__set_key, key)
             p.lpush(self.__set_evict_list_key, key)
 
-        self.p.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
+        self.__r.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
 
     def add(self, key):
         self.__evict(key)
-        is_member = False
 
         def trans_func(p):
-            global is_member
-            is_member = bool(self.p.sismember(self.__set_key, key))
+            bool(self.__r.sismember(self.__set_key, key))
         
-        self.p.transaction(trans_func, *[self.__set_key])
+        is_member = self.__r.transaction(trans_func, *[self.__set_key])
 
         if not is_member:
             self.__add(key)
@@ -133,7 +127,7 @@ class RedisFIFOSet:
         """The current size of the cache."""
 
         # TODO: Do I need Transaction here? I am not sure yet.
-        return self.p.llen(self.__set_evict_list_key)
+        return self.__r.llen(self.__set_evict_list_key)
 
     @staticmethod
     def getsizeof(value):
@@ -143,12 +137,12 @@ class RedisFIFOSet:
     @property
     def hits(self):
         """Return the # of hits."""
-        return int(self.p.get(self.__hits_key))
+        return int(self.__r.get(self.__hits_key))
 
     @property
     def misses(self):
         """Return the # of misses"""
-        return int(self.p.get(self.__misses_key)) or 1
+        return int(self.__r.get(self.__misses_key)) or 1
 
     @property
     def cache_info(self):
