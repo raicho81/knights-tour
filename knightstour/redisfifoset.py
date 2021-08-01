@@ -57,7 +57,7 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    @cachetools.func.lru_cache(maxsize=131112)
+    @cachetools.func.lru_cache(maxsize=16384)
     def __contains__(self, key):
 
         def trans_func(p):
@@ -84,38 +84,28 @@ class RedisFIFOSet:
     
     def __evict(self, key):
         cursz = self.currsize
-        
         if self.__maxsize and (cursz + self.getsizeof(key)) < self.__maxsize:
             return
+
         how_much_to_evict = min(self.__evict_count, cursz)
-        
-        def trans_func_to_evict(p):
+
+        def trans_func_evict(p):
             llen = p.llen(self.__set_evict_list_key)
-            return p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
-    
-        to_evict = self.__r.transaction(trans_func_to_evict, *[self.__set_evict_list_key])
+            to_evict =  p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
 
-        def trans_func_rpop(p):
-            for _ in to_evict:
-                p.rpop(self.__set_evict_list_key)
-
-        self.__r.transaction(trans_func_rpop, *[self.__set_evict_list_key])
-
-        def trans_func_srem(p):            
-            p.srem(self.__set_key, elm_to_evict)
-            self.__contains__.pop(key)
-
-        self.__r.transaction(trans_func_srem, *[self.__set_key,])       
+            for elm_to_evict in to_evict:
+                p.rpop(self.__set_evict_list_key)     
+                p.srem(self.__set_key, elm_to_evict)
+                self.__contains__.pop(key)
+        
+        self.__r.transaction(trans_func_evict, *[self.__set_evict_list_key,])       
 
     def __add(self, key):
-        def trans_func_sadd(p):
+        def trans_func(p):
             p.sadd(self.__set_key, key)
-
-        def trans_func_lpush(p):
             p.lpush(self.__set_evict_list_key, key)
 
-        self.__r.transaction(trans_func_sadd, *[self.__set_key])
-        self.__r.transaction(trans_func_lpush, *[self.__set_evict_list_key])
+        self.__r.transaction(trans_func, *[self.__set_evict_list_key])
 
     def add(self, key):
         self.__evict(key)
