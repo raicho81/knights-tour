@@ -91,14 +91,14 @@ class RedisFIFOSet:
 
         def trans_func_evict(p):
             llen = p.llen(self.__set_evict_list_key)
-            return p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
+            to_evict = p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
 
-        to_evict = self.__r.transaction(trans_func_evict, *[self.__set_evict_list_key,])    
+            for elm_to_evict in to_evict:
+                self.__r.rpop(self.__set_evict_list_key)
+                self.__r.srem(self.__set_key, elm_to_evict)
+                self.__contains__.pop(key)   
 
-        for elm_to_evict in to_evict:
-            self.__r.rpop(self.__set_evict_list_key)     
-            self.__r.srem(self.__set_key, elm_to_evict)
-            self.__contains__.pop(key)   
+        self.__r.transaction(trans_func_evict, *[self.__set_evict_list_key,])    
 
     def __add(self, key):
         self.__r.sadd(self.__set_key, key)
