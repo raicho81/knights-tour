@@ -228,7 +228,6 @@ class KnightsTourAlgo:
                 try:
                     self.check_path(new_path)
                     self.found_walks_count += 1
-                    # This goes to Redis it is a shared state
                 except RuntimeError as rte:
                     logging.error(rte)
             else:
@@ -355,7 +354,6 @@ class KnightsTourAlgo:
                 break
 
             current_path.append(new_path_possible_moves[0])
-            self.find_walks_celery_task(current_path, new_path_possible_moves[1])
 
     def bootstrap_search_celery(self):
         logging.info("[Start search with Celery Tasks]")

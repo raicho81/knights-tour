@@ -32,11 +32,11 @@ class RedisFIFOSet:
     def clean_redis_structures(self):
         
         def trans_func(p):
-            p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key)
+            p.delete(*[self.__set_evict_list_key, self.__set_key])
             p.set(self.__hits_key, 0)
             p.set(self.__misses_key, 0)
 
-        self.p.transaction(trans_func, *[self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key, self.__hits_key, self.__misses_key])
+        self.p.transaction(trans_func, *[self.__set_evict_list_key, self.__set_key])
 
     def __repr__(self):
         s = [key for key in self]
@@ -66,15 +66,15 @@ class RedisFIFOSet:
         def trans_func(p):
             global ret
             ret = bool(p.sismember(self.__set_key, key))
-            
+        
+        self.p.transaction(trans_func, *[self.__set_key])
+
         if ret:
             self.p.incr(self.__hits_key)
         else:
             self.p.incr(self.__misses_key)
             self.__evict(key)
             self.add(key)
-
-        self.p.transaction(trans_func, *[self.__set_key])
         
         return ret
 
