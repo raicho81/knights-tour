@@ -414,9 +414,8 @@ class KnightsTourAlgo:
 
         tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
-        # for elm in self.negative_outcome_nodes_cache:
-        #     logging.debug(elm)
 
         logging.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
         logging.info("*** ALGO END ***".format())
+
         return tt, tt / (self.found_walks_count or 1)
