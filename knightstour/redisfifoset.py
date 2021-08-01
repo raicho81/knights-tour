@@ -31,12 +31,15 @@ class RedisFIFOSet:
 
     def clean_redis_structures(self):
         
-        def trans_func(p):
+        def trans_func_delete(p):
             p.delete(*[self.__set_evict_list_key, self.__set_key])
+
+        def trans_func_set(p):
             p.set(self.__hits_key, 0)
             p.set(self.__misses_key, 0)
 
-        self.__r.transaction(trans_func, *[self.__set_evict_list_key, self.__set_key])
+        self.__r.transaction(trans_func_delete, *[self.__set_evict_list_key, self.__set_key,])
+        self.__r.transaction(trans_func_set, *[self.__hits_key, self.__misses_key])
 
     def __repr__(self):
         s = [key for key in self]
@@ -89,22 +92,33 @@ class RedisFIFOSet:
             return
         how_much_to_evict = min(self.__evict_count, cursz)
         
-        def trans_func(p):
+        def trans_func_to_evict(p):
             llen = p.llen(self.__set_evict_list_key)
-            to_evict = p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
-            for elm_to_evict in to_evict:
-                p.srem(self.__set_key, elm_to_evict)
-                p.rpop(self.__set_evict_list_key)
-                self.__contains__.pop(key)
+            return p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
+    
+        to_evict = self.__r.transaction(trans_func_to_evict, *[self.__set_evict_list_key])
 
-        self.__r.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
+        def trans_func_rpop(p):
+            for _ in to_evict:
+                p.rpop(self.__set_evict_list_key)
+
+        self.__r.transaction(trans_func_rpop, *[self.__set_evict_list_key])
+
+        def trans_func_srem(p):            
+            p.srem(self.__set_key, elm_to_evict)
+            self.__contains__.pop(key)
+
+        self.__r.transaction(trans_func_srem, *[self.__set_key,])       
 
     def __add(self, key):
-        def trans_func(p):
+        def trans_func_sadd(p):
             p.sadd(self.__set_key, key)
+
+        def trans_func_lpush(p):
             p.lpush(self.__set_evict_list_key, key)
 
-        self.__r.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
+        self.__r.transaction(trans_func_sadd, *[self.__set_key])
+        self.__r.transaction(trans_func_lpush, *[self.__set_evict_list_key])
 
     def add(self, key):
         self.__evict(key)
