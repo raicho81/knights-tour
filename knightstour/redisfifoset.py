@@ -82,6 +82,13 @@ class RedisFIFOSet:
     def __len__(self):
         return self.__r.llen(self.__set_evict_list_key)
 
+    def compare_lists(self):
+        rl = set(self.__r.sort(self.__set_evict_list_key))
+        sl = {key for key in self.negative_outcome_nodes_cache_local}
+        rs = set(rl)
+        diff = rl.difference(rs)
+        diff and logging.debug("lists (as sets) diff is {}}".format([key for key in diff]))
+    
     def __evict(self, key):
         cursz = self.currsize
         if self.__maxsize and (cursz + self.getsizeof(key)) < self.__maxsize:
@@ -99,16 +106,20 @@ class RedisFIFOSet:
                 self.__contains__.pop(key)
             try:
                 p.execute()
+                logging.debug("self.currsize: {}".format(self.currsize))
+                self.compare_lists()
             except BrokenPipeError as e:
-                logging.error(e)
-    
-    
+               self.logging.error(e)
+
+ 
     def __add(self, key):
         with self.__r.pipeline(transaction=True) as p:
             p.sadd(self.__set_key, key)
             p.lpush(self.__set_evict_list_key, key)
             try:
                 p.execute()
+                logging.debug("self.currsize: {}".format(self.currsize))
+                self.compare_lists()
             except BrokenPipeError as e:
                 logging.error(e)
     
@@ -117,6 +128,7 @@ class RedisFIFOSet:
         if not bool(self.__r.sismember(self.__set_key, key)):
             self.__add(key)
             self.negative_outcome_nodes_cache_local.add(key)
+            self.compare_lists()
 
     @property
     def maxsize(self):

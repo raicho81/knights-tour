@@ -9,9 +9,7 @@ def config_logging():
     log_filename += ".{0}x{0}.log".format(settings.BOARD_SIZE)
     logging.basicConfig(filename=log_filename,
                         filemode=settings.LOG_FILE_MODE,
-                        # encoding='utf-8',
-                        format='[%(asctime)s %(levelname)s] %(message)s',
-                        level=logging.DEBUG)
+                        format='[%(asctime)s %(levelname)s] [%(pathname)s:%(lineno)d] [%(message)s]', level=logging.DEBUG)
     print("[Logging configured. Log filename is: {}]".format(log_filename))
 
 

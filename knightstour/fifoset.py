@@ -59,20 +59,27 @@ class FIFOSet:
             del self.__set_first_added[index]
             del self.__set[key]
             self.__currsize -= self.getsizeof(key)
+            logging.debug("self.__currsize: {}".format(self.__currsize))
         except IndexError as e:
             logging.error(e)    
 
-    def add(self, key):
-        if self.__maxsize and (self.__currsize + self.getsizeof(key)) > self.__maxsize:
-            for _ in range(min(self.__evict_count, self.__currsize)):
-                k = self.__set_first_added.popleft()
-                self.__set.remove(k)
-                self.__currsize -= self.getsizeof(key)
+    def __evict(self, key):
+        if self.__maxsize and (self.__currsize + self.getsizeof(key)) < self.__maxsize:
+            return
 
+        for _ in range(min(self.__evict_count, self.__currsize)):
+            k = self.__set_first_added.popleft()
+            self.__set.remove(k)
+            self.__currsize -= self.getsizeof(key)
+            logging.debug("self.__currsize: {}".format(self.__currsize))
+
+    def add(self, key):
+        self.__evict(key)
         if key not in self.__set:
             self.__set_first_added.append(key)
             self.__set.add(key)
             self.__currsize += self.getsizeof(key)
+            logging.debug("self.__currsize: {}".format(self.__currsize))
 
     def pop(self, key):
         try:
@@ -80,6 +87,7 @@ class FIFOSet:
             self.__set_first_added.remove(index)
             self.__set.remove(key)
             self.__currsize -= self.getsizeof(key)
+            logging.debug("self.__currsize: {}".format(self.__currsize))
         except IndexError as e:
             logging.error(e)
         
