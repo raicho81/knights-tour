@@ -219,11 +219,11 @@ class KnightsTourAlgo:
         if not self.enable_cache:
             return
 
-        logging.info("\n[{} self.negative_outcome_nodes_cache Info: {}]".format(
+        logging.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
 
-        logging.info("\n[{} self.find_possible_moves_helper Info: {}]".format(
+        logging.info("[{} self.find_possible_moves_helper Info: {}]".format(
             what,
             self.find_possible_moves_cached.cache_info()))
 

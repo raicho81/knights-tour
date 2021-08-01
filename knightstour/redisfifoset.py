@@ -19,9 +19,7 @@ class RedisFIFOSet:
                 redis_set_key=None,
                 redis_ev_list_key=None,
                 redis_hits_key=None,
-                redis_misses_key=None,
-                negative_outcome_nodes_max_local_cache_size=1000000,
-                negative_outcome_nodes_local_evict_count=1000):
+                redis_misses_key=None):
 
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
@@ -32,11 +30,6 @@ class RedisFIFOSet:
         self.__r = redis_pool_obj
         
         self.clean_redis_structures()
-
-        self.negative_outcome_nodes_max_local_cache_size = negative_outcome_nodes_max_local_cache_size
-        self.negative_outcome_nodes_local_evict_count = negative_outcome_nodes_local_evict_count
-        self.negative_outcome_nodes_cache_local = FIFOSet(maxsize=self.negative_outcome_nodes_max_local_cache_size,
-                                                          evict_count=self.negative_outcome_nodes_local_evict_count)
 
     def clean_redis_structures(self):
         p = self.__r.pipeline(transaction=True)
@@ -60,13 +53,10 @@ class RedisFIFOSet:
             self.__evict_count
         )
 
-    # @cachetools.func.lru_cache(maxsize=131112)
+    @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
-        if key in self.negative_outcome_nodes_cache_local:
-            return True
-        self.negative_outcome_nodes_cache_local.add(key)
-
         ret = bool(self.__r.sismember(self.__set_key, key))
+        
         if ret:
             self.__r.incr(self.__hits_key)
         else:
@@ -77,7 +67,7 @@ class RedisFIFOSet:
         return ret
 
     def __iter__(self):
-        yield from self.__r.sscan_iter(self.__set_key)
+        return  iter(self.__r.sscan_iter(self.__set_key))
 
     def __len__(self):
         return self.__r.llen(self.__set_evict_list_key)
@@ -110,7 +100,6 @@ class RedisFIFOSet:
             try:
                 p.execute()
                 logging.debug("self.currsize: {}".format(self.currsize))
-                # self.compare_lists()
             except BrokenPipeError as e:
                self.logging.error(e)
 
@@ -122,7 +111,6 @@ class RedisFIFOSet:
             try:
                 p.execute()
                 logging.debug("self.currsize: {}".format(self.currsize))
-                # self.compare_lists()
             except BrokenPipeError as e:
                 logging.error(e)
     
@@ -130,8 +118,6 @@ class RedisFIFOSet:
         self.__evict(key)
         if not bool(self.__r.sismember(self.__set_key, key)):
             self.__add(key)
-            self.negative_outcome_nodes_cache_local.add(key)
-            # self.compare_lists()
 
     @property
     def maxsize(self):
@@ -163,13 +149,12 @@ class RedisFIFOSet:
         return f"{self.__class__.__name__} Cache Info : [" \
                f"Hit Rate %: {100 * self.hits / self.misses}, Hits: {self.hits}," \
                f"Misses: {self.misses}, Size: {self.currsize}]\n"\
-               f"[Local cache info: {self.negative_outcome_nodes_cache_local.cache_info()}]"
+               f"[Local cache info: {self.__contains__.cache_info()}]"
 
     def cache_clear(self):
         """
             Clear FIFOSet data
         """
         self.clean_redis_structures()
-        # self.__contains__.cache_clear()
-        self.negative_outcome_nodes_cache_local.cache_clear()
+        self.__contains__.cache_clear()
         logging.info("[{} cache cleared]".format(self.__class__.__name__))
