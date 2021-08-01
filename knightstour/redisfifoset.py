@@ -33,16 +33,10 @@ class RedisFIFOSet:
         
         def trans_func_delete(p):
             p.delete(*[self.__set_evict_list_key, self.__set_key])
-
-        def trans_func_set_hits(p):
             p.set(self.__hits_key, 0)
-
-        def trans_func_set_misses(p):
             p.set(self.__misses_key, 0)
 
         self.__r.transaction(trans_func_delete, *[self.__set_evict_list_key, self.__set_key,])
-        self.__r.transaction(trans_func_set_hits, *[self.__hits_key])
-        self.__r.transaction(trans_func_set_mises, *[self.__misses_key])
 
     def __repr__(self):
         s = [key for key in self]
