@@ -27,20 +27,26 @@ class RedisFIFOSet:
         self.__evict_count = evict_count
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
-        self.__r = redis_pool_obj
-        
-        self.clean_redis_structures()
+        self.p = redis_pool_obj
 
     def clean_redis_structures(self):
-        p = self.__r.pipeline(transaction=True)
-        p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key)
-        p.set(self.__hits_key, 0)
-        p.set(self.__misses_key, 0)
-        p.execute()
+        
+        def trans_func(p):
+            p.delete(self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key)
+            p.set(self.__hits_key, 0)
+            p.set(self.__misses_key, 0)
+
+        self.p.transaction(trans_func, *[self.__set_evict_list_key, self.__hits_key, self.__misses_key, self.__set_key, self.__hits_key, self.__misses_key])
 
     def __repr__(self):
         s = [key for key in self]
-        l = self.__r.lrange(self.__set_evict_list_key, 0, -1)
+        l = None
+
+        def trans_func(p):
+            global l
+            l = p.lrange(self.__set_evict_list_key, 0, -1)
+
+        self.p.transaction(trans_func, *[self.__set_evict_list_key])
         
         return "{} (set: {}, list: {}, maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
             self.__class__.__name__,
@@ -55,68 +61,66 @@ class RedisFIFOSet:
 
     @cachetools.func.lru_cache(maxsize=131112)
     def __contains__(self, key):
-        ret = bool(self.__r.sismember(self.__set_key, key))
-        
+        ret = False
+
+        def trans_func(p):
+            global ret
+            ret = bool(p.sismember(self.__set_key, key))
+            
         if ret:
-            self.__r.incr(self.__hits_key)
+            self.p.incr(self.__hits_key)
         else:
-            self.__r.incr(self.__misses_key)
+            self.p.incr(self.__misses_key)
             self.__evict(key)
             self.add(key)
 
+        self.p.transaction(trans_func, *[self.__set_key])
+        
         return ret
 
     def __iter__(self):
-        return  iter(self.__r.sscan_iter(self.__set_key))
+        # TODO: Do I need Transaction here? I am not sure yet.
+        return  iter(self.p.sscan_iter(self.__set_key))
 
     def __len__(self):
-        return self.__r.llen(self.__set_evict_list_key)
-
-    def compare_lists(self):
-        redis_list = [int(x) for x in self.__r.sort(self.__set_evict_list_key)]
-        set_list = [key for key in self.negative_outcome_nodes_cache_local]
-        
-        redis_set = set(redis_list)
-        set_set = set(set_list)
-        
-        diff = redis_set.difference(iter(set_set))
-        diff and logging.debug("lists (as sets) diff between redis list and normal set list is: {} keyss".format(diff))
+        # TODO: Do I need Transaction here? I am not sure yet.
+        return self.p.llen(self.__set_evict_list_key)
     
     def __evict(self, key):
         cursz = self.currsize
+        
         if self.__maxsize and (cursz + self.getsizeof(key)) < self.__maxsize:
             return
-        
         how_much_to_evict = min(self.__evict_count, cursz)
-        llen = self.__r.llen(self.__set_evict_list_key)
-        to_evict = self.__r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
-
-        with self.__r.pipeline(transaction=True) as p:
+        
+        def trans_func(p):
+            llen = p.llen(self.__set_evict_list_key)
+            to_evict = p.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
             for elm_to_evict in to_evict:
-                self.__r.srem(self.__set_key, elm_to_evict)
-                self.__r.rpop(self.__set_evict_list_key)
-                # self.__contains__.del_(key)
+                p.srem(self.__set_key, elm_to_evict)
+                p.rpop(self.__set_evict_list_key)
                 self.__contains__.pop(key)
-            try:
-                p.execute()
-                logging.debug("self.currsize: {}".format(self.currsize))
-            except BrokenPipeError as e:
-               self.logging.error(e)
 
- 
+        self.p.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
+
     def __add(self, key):
-        with self.__r.pipeline(transaction=True) as p:
+        def trans_func(p):
             p.sadd(self.__set_key, key)
             p.lpush(self.__set_evict_list_key, key)
-            try:
-                p.execute()
-                logging.debug("self.currsize: {}".format(self.currsize))
-            except BrokenPipeError as e:
-                logging.error(e)
-    
+
+        self.p.transaction(trans_func, *[self.__set_key, self.__set_evict_list_key])
+
     def add(self, key):
         self.__evict(key)
-        if not bool(self.__r.sismember(self.__set_key, key)):
+        is_member = False
+
+        def trans_func(p):
+            global is_member
+            is_member = bool(self.p.sismember(self.__set_key, key))
+        
+        self.p.transaction(trans_func, *[self.__set_key])
+
+        if not is_member:
             self.__add(key)
 
     @property
@@ -127,7 +131,9 @@ class RedisFIFOSet:
     @property
     def currsize(self):
         """The current size of the cache."""
-        return self.__r.llen(self.__set_evict_list_key)
+
+        # TODO: Do I need Transaction here? I am not sure yet.
+        return self.p.llen(self.__set_evict_list_key)
 
     @staticmethod
     def getsizeof(value):
@@ -137,12 +143,12 @@ class RedisFIFOSet:
     @property
     def hits(self):
         """Return the # of hits."""
-        return int(self.__r.get(self.__hits_key))
+        return int(self.p.get(self.__hits_key))
 
     @property
     def misses(self):
         """Return the # of misses"""
-        return int(self.__r.get(self.__misses_key)) or 1
+        return int(self.p.get(self.__misses_key)) or 1
 
     @property
     def cache_info(self):

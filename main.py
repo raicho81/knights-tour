@@ -12,7 +12,6 @@ def config_logging():
                         format='[%(asctime)s %(levelname)s] [%(pathname)s:%(lineno)d] [%(message)s]', level=logging.INFO)
     print("[Logging configured. Log filename is: {}]".format(log_filename))
 
-
 def main():
     config_logging()
     runtimes = []

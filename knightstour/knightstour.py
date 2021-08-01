@@ -23,7 +23,6 @@ class KnightsTourAlgo:
 
     def __init__(self, board_size, brute_force=False, run_time_checks=True, enable_cache=True, min_negative_path_len=2,
                  negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3,
-                 negative_outcome_nodes_max_local_cache_size = 100000,
                  redis_host="", redis_port=0, redis_password="", redis_set_key=settings.REDIS_SET_KEY,
                  redis_ev_list_key=settings.REDIS_EV_LIST_KEY, redis_hits_key=settings.REDIS_HITS_KEY,
                  redis_misses_key=settings.REDIS_MISSES_KEY,
@@ -46,7 +45,6 @@ class KnightsTourAlgo:
                                       decode_responses=True)
 
         # self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
-        self.negative_outcome_nodes_max_local_cache_size = negative_outcome_nodes_max_local_cache_size
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
             evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
@@ -54,10 +52,7 @@ class KnightsTourAlgo:
             redis_set_key=redis_set_key,
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
-            redis_misses_key=redis_misses_key,
-            negative_outcome_nodes_max_local_cache_size=100000)
-
-        # self.negative_outcome_nodes_cache.clean_redis_structures()
+            redis_misses_key=redis_misses_key)
 
         self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
