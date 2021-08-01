@@ -101,11 +101,8 @@ class RedisFIFOSet:
             self.__contains__.pop(key)   
 
     def __add(self, key):
-        def trans_func(p):
-            p.sadd(self.__set_key, key)
-            p.lpush(self.__set_evict_list_key, key)
-
-        self.__r.transaction(trans_func, *[self.__set_evict_list_key])
+        self.__r.sadd(self.__set_key, key)
+        self.__r.lpush(self.__set_evict_list_key, key)
 
     def add(self, key):
         self.__evict(key)
