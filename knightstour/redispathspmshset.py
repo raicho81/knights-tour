@@ -5,6 +5,9 @@ import crc16
 import redis
 import itertools
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 class RedisPathsPmsHSet:
     """
@@ -50,7 +53,7 @@ class RedisPathsPmsHSet:
             slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, self.current_cache_slot_n)
             slot_content_iter = self.r.hscan_iter(slot)
             self.current_slot_local_cpy = dict(slot_content_iter)
-            logging.info("Loaded cache slot: {} into self.current_slot_local_cpy".format(slot))
+            logger.info("Loaded cache slot: {} into self.current_slot_local_cpy".format(slot))
 
         ret = str(key) in self.current_slot_local_cpy
         return ret

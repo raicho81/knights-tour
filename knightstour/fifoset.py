@@ -1,7 +1,9 @@
 import collections
 import sys
 import logging
-import redis
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class FIFOSet:
@@ -59,9 +61,9 @@ class FIFOSet:
             del self.__set_first_added[index]
             del self.__set[key]
             self.__currsize -= self.getsizeof(key)
-            logging.debug("self.__currsize: {}".format(self.__currsize))
+            logger.debug("self.__currsize: {}".format(self.__currsize))
         except IndexError as e:
-            logging.error(e)    
+            logger.error(e)    
 
     def __evict(self, key):
         if self.__maxsize and (self.__currsize + self.getsizeof(key)) < self.__maxsize:
@@ -71,7 +73,7 @@ class FIFOSet:
             k = self.__set_first_added.popleft()
             self.__set.remove(k)
             self.__currsize -= self.getsizeof(key)
-            logging.debug("self.__currsize: {}".format(self.__currsize))
+            logger.debug("self.__currsize: {}".format(self.__currsize))
 
     def add(self, key):
         self.__evict(key)
@@ -79,7 +81,7 @@ class FIFOSet:
             self.__set_first_added.append(key)
             self.__set.add(key)
             self.__currsize += self.getsizeof(key)
-            logging.debug("self.__currsize: {}".format(self.__currsize))
+            logger.debug("self.__currsize: {}".format(self.__currsize))
 
     def pop(self, key):
         try:
@@ -87,9 +89,9 @@ class FIFOSet:
             self.__set_first_added.remove(index)
             self.__set.remove(key)
             self.__currsize -= self.getsizeof(key)
-            logging.debug("self.__currsize: {}".format(self.__currsize))
+            logger.debug("self.__currsize: {}".format(self.__currsize))
         except IndexError as e:
-            logging.error(e)
+            logger.error(e)
         
         return key
 
@@ -132,4 +134,4 @@ class FIFOSet:
         self.__currsize = 0
         self.__hits = 0
         self.__misses = 0
-        logging.info("[FIFOSet cache cleared]")
+        logger.info("[FIFOSet cache cleared]")

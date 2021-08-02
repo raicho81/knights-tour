@@ -10,8 +10,10 @@ from dynaconf import settings
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
-from knightstour import FIFOSet
 import knightstour.celery_tasks
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 class KnightsTourAlgo:
@@ -214,11 +216,11 @@ class KnightsTourAlgo:
         if not self.enable_cache:
             return
 
-        logging.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
+        logger.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
 
-        logging.info("[{} self.find_possible_moves_helper Info: {}]".format(
+        logger.info("[{} self.find_possible_moves_helper Info: {}]".format(
             what,
             self.find_possible_moves_cached.cache_info()))
 
@@ -229,11 +231,11 @@ class KnightsTourAlgo:
                     self.check_path(new_path)
                     self.found_walks_count += 1
                 except RuntimeError as rte:
-                    logging.error(rte)
+                    logger.error(rte)
             else:
                 self.found_walks_count += 1
 
-            logging.info("[Path#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            logger.info("[Path#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
             return True
 
@@ -301,11 +303,11 @@ class KnightsTourAlgo:
             current_path.pop()
 
     def print_all_walks_info(self):
-        logging.info("[# of possible walks found so far: {}]".format(self.found_walks_count))
+        logger.info("[# of possible walks found so far: {}]".format(self.found_walks_count))
         self.log_cache_info(what="Final")
 
     def bootstrap_search(self):
-        logging.info("[Start search]".format(self.found_walks_count))
+        logger.info("[Start search]".format(self.found_walks_count))
         possible_moves = []
         possible_move_min_len = 0
 
@@ -356,7 +358,7 @@ class KnightsTourAlgo:
             current_path.append(new_path_possible_moves[0])
 
     def bootstrap_search_celery(self):
-        logging.info("[Start search with Celery Tasks]")
+        logger.info("[Start search with Celery Tasks]")
         possible_moves = []
         possible_move_min_len = 0
 
@@ -384,20 +386,20 @@ class KnightsTourAlgo:
             # self.find_walks_celery_task([pm[0]], pm[1])
 
     def run(self):
-        logging.info("[*** ALGO PARAMETERS START ***]")
-        logging.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
-        logging.info("[Brute force: {}]".format(self.brute_force))
-        logging.info("[Cache enabled: {}]".format(self.enable_cache))
-        logging.info("[Redis: {}]".format(self.redis_host + ":" + str(self.redis_port)))
-        logging.info("[Run time checks: {}]".format(self.run_time_checks))
-        self.enable_cache and (logging.info("[Min negative path len: {}]".format(self.min_negative_path_len)),
-                               logging.info("[Negative outcome nodes max cache size: {}]".format(
+        logger.info("[*** ALGO PARAMETERS START ***]")
+        logger.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
+        logger.info("[Brute force: {}]".format(self.brute_force))
+        logger.info("[Cache enabled: {}]".format(self.enable_cache))
+        logger.info("[Redis: {}]".format(self.redis_host + ":" + str(self.redis_port)))
+        logger.info("[Run time checks: {}]".format(self.run_time_checks))
+        self.enable_cache and (logger.info("[Min negative path len: {}]".format(self.min_negative_path_len)),
+                               logger.info("[Negative outcome nodes max cache size: {}]".format(
                                    self.negative_outcome_nodes_max_cache_size)))
-        logging.info("[*** ALGO PARAMETERS END ***]")
-        self.enable_cache and (logging.info("[Clearing caches]"),
+        logger.info("[*** ALGO PARAMETERS END ***]")
+        self.enable_cache and (logger.info("[Clearing caches]"),
                                self.find_possible_moves_cached.cache_clear(),
                                self.negative_outcome_nodes_cache.cache_clear(),
-                               logging.info("[Caches cleared]"))
+                               logger.info("[Caches cleared]"))
 
         self.log_cache_info_timer.start()
         self.bootstrap_search()
@@ -408,7 +410,7 @@ class KnightsTourAlgo:
         tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
 
-        logging.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
-        logging.info("*** ALGO END ***".format())
+        logger.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
+        logger.info("*** ALGO END ***".format())
 
         return tt, tt / (self.found_walks_count or 1)
