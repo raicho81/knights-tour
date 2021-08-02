@@ -17,7 +17,6 @@ class RedisFIFOSet:
                 redis_ev_list_key=None,
                 redis_hits_key=None,
                 redis_misses_key=None):
-
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
         self.__maxsize = maxsize
@@ -25,9 +24,8 @@ class RedisFIFOSet:
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
         self.__r = redis_pool_obj
-        
-        # Sunchronize access to critical functions with Redis Redlock
-        self.clean_redis_structures = synchronize(key='knights_tour_synchronized_clean_redis_structures', masters={self.__r}, auto_release_time=1000, blocking=True, timeout=-1)(self.clean_redis_structures)
+        # Sunchronize access to critical functions with Redis Redlock currently using the pottery implementation
+        self.clean_redis_structures = synchronize(key='knights_tour_synchronized_clean_redis_structures', masters={self.__r}, blocking=True, timeout=1000)(self.clean_redis_structures)
         self.add = synchronize(key='knights_tour_synchronized_add', masters={self.__r}, blocking=True, timeout=1000)(self.add)
 
     def clean_redis_structures(self):
@@ -36,12 +34,6 @@ class RedisFIFOSet:
             self.__r.set(self.__misses_key, 0)
 
     def __repr__(self):
-        # s = [key for key in self]
-
-        # def trans_func(p):
-        #     return p.lrange(self.__set_evict_list_key, 0, -1)
-
-        # l = self.__r.transaction(trans_func, *[self.__set_evict_list_key]) 
         return "{} (maxsize={}, currsize={}, hits={}, misses={}, evict_count={})".format(
             self.__class__.__name__,
             self.__maxsize,
@@ -54,37 +46,31 @@ class RedisFIFOSet:
     @cachetools.func.lru_cache(maxsize=32688)
     def __contains__(self, key):
         ret = self.__r.transaction(lambda p: bool(p.sismember(self.__set_key, key)), *[self.__set_key], value_from_callable=True)
-
         if ret:
             self.__r.incr(self.__hits_key)
         else:
             self.__r.incr(self.__misses_key)
             self.add(key, is_member=ret)
-        
         return ret
 
     def __iter__(self):
-        # TODO: Do I need Transaction/Redlock here? I am not sure yet.
+        # TODO: Do I need Transaction/Redlock here or what I need indeed? I am not sure yet.
         return  iter(self.__r.sscan_iter(self.__set_key))
 
     def __len__(self):
         def trans_func_llen(p):
             l = int(p.llen(self.__set_evict_list_key))
             return l
-        
         ll = self.__r.transaction(trans_func_llen, *[self.__set_evict_list_key], value_from_callable=True)
-    
         return ll
         
     def __evict(self, key):
         cursz = self.currsize
         if self.__maxsize and (cursz + self.getsizeof(key)) <= self.__maxsize:
             return
-
         how_much_to_evict = min(self.__evict_count, cursz)
         llen = self.__r.llen(self.__set_evict_list_key)
         to_evict = self.__r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
-
         for elm_to_evict in to_evict:
             self.__r.rpop(self.__set_evict_list_key)
             self.__r.srem(self.__set_key, elm_to_evict)
@@ -97,7 +83,6 @@ class RedisFIFOSet:
     def add(self, key, is_member=None):
         if is_member is None:
             is_member = bool(self.__r.sismember(self.__set_key, key))
-
         self.__evict(key)
         if not is_member:
             self.__add(key)
@@ -110,19 +95,16 @@ class RedisFIFOSet:
     @property
     def currsize(self):
         """The current size of the cache."""
-
         return len(self)
 
     @staticmethod
     def getsizeof(value):
         """Return the size of a cache element's value."""
-        
         return 1
 
     @property
     def hits(self):
         """Return the # of hits."""
-
         return int(self.__r.transaction(lambda p: p.get(self.__hits_key), *[self.__hits_key], value_from_callable=True))
 
     @property

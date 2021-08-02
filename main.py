@@ -16,10 +16,8 @@ def main():
     config_logging()
     runtimes = []
     runtimes_per_path = []
-
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-
     logger.info("[*** TEST START***]")
     for run_number in range(settings.N_RUNS):
         logger.info("[*** TEST RUN # {} ***]".format(run_number + 1))
@@ -41,7 +39,6 @@ def main():
         rt, rt_path = kta.run()
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
-
     logger.info("=" * 100)
     logger.info("[Avg. runtime after #{} runs is: {}, avg. runtime per path is: {}. ]"
                  .format(len(runtimes),

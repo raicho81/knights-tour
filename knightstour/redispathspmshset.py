@@ -47,7 +47,6 @@ class RedisPathsPmsHSet:
 
     def __contains__(self, key):
         slot_n: Union[int, Any] = self.slot_n(bytes(key)) % self.cache_slots_count
-
         if slot_n != self.current_cache_slot_n:
             self.current_cache_slot_n = slot_n
             slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, self.current_cache_slot_n)

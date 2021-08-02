@@ -29,14 +29,12 @@ class KnightsTourAlgo:
                  redis_ev_list_key=settings.REDIS_EV_LIST_KEY, redis_hits_key=settings.REDIS_HITS_KEY,
                  redis_misses_key=settings.REDIS_MISSES_KEY,
                  log_cache_info_timer_timeout=60):
-
         self.enable_cache = enable_cache
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
         self.negative_outcome_nodes_max_cache_size = negative_outcome_nodes_max_cache_size
-
         # Init Redis Connection
         self.redis_host = redis_host
         self.redis_port = redis_port
@@ -45,7 +43,6 @@ class KnightsTourAlgo:
                                       port=self.redis_port,
                                       password=self.redis_password,
                                       decode_responses=True)
-
         # self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
@@ -55,7 +52,6 @@ class KnightsTourAlgo:
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
             redis_misses_key=redis_misses_key)
-
         self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
@@ -102,31 +98,24 @@ class KnightsTourAlgo:
         new_node = (node[0] + 1, node[1] + 2)
         if new_node[0] < self.board_size and new_node[1] < self.board_size:
             possible_moves.append(new_node)
-
         new_node = (node[0] + 1, node[1] - 2)
         if new_node[0] < self.board_size and new_node[1] >= 0:
             possible_moves.append(new_node)
-
         new_node = (node[0] + 2, node[1] + 1)
         if new_node[0] < self.board_size and new_node[1] < self.board_size:
             possible_moves.append(new_node)
-
         new_node = (node[0] + 2, node[1] - 1)
         if new_node[0] < self.board_size and new_node[1] >= 0:
             possible_moves.append(new_node)
-
         new_node = (node[0] - 2, node[1] + 1)
         if new_node[0] >= 0 and new_node[1] < self.board_size:
             possible_moves.append(new_node)
-
         new_node = (node[0] - 2, node[1] - 1)
         if new_node[0] >= 0 and new_node[1] >= 0:
             possible_moves.append(new_node)
-
         new_node = (node[0] - 1, node[1] + 2)
         if new_node[0] >= 0 and new_node[1] < self.board_size:
             possible_moves.append(new_node)
-
         new_node = (node[0] - 1, node[1] - 2)
         if new_node[0] >= 0 and new_node[1] >= 0:
             possible_moves.append(new_node)
@@ -176,12 +165,9 @@ class KnightsTourAlgo:
             if not pms:
                 path.append(node)
                 raise RuntimeError("[Previous node in the path doesn't have possible moves! path: {}]".format(path))
-
             if len(pms) > 1:
                 break
-
             self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
-
         self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
 
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):   # This is going to Celery and will be working with the Redis cache instead of local cache
@@ -205,7 +191,6 @@ class KnightsTourAlgo:
                     "[Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}]"
                         .format(path, node, pms, next_node))
             node = next_node
-
         path = tuple(path)
         if path in self.generated_paths_set:
             raise RuntimeError("[Path is already generated! path: {}, node: {}, pms: {}, next_node: {}]"
@@ -215,11 +200,9 @@ class KnightsTourAlgo:
     def log_cache_info(self, what):
         if not self.enable_cache:
             return
-
         logger.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
-
         logger.info("[{} self.find_possible_moves_helper Info: {}]".format(
             what,
             self.find_possible_moves_cached.cache_info()))
@@ -234,11 +217,8 @@ class KnightsTourAlgo:
                     logger.error(rte)
             else:
                 self.found_walks_count += 1
-
             logger.info("[Path#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
-
             return True
-
         return False
 
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
@@ -260,7 +240,6 @@ class KnightsTourAlgo:
                     # remove and remove them later and observe the results.
 
                 new_path.pop()
-
         if new_pms:
             current_new_paths_pms.append((new_path[-1], new_pms)) # I guess I have to return current_new_paths_pms as a result of the function
         else:
@@ -274,30 +253,23 @@ class KnightsTourAlgo:
         :return:
         """
         current_new_paths_pms = []
-
         for possible_move in possible_moves:
             current_path.append(possible_move)
-
             if self.check_if_path_found(current_path):
                 current_path.pop()
                 continue
-
             self.find_new_pms_and_dead_ends(current_path, current_new_paths_pms)
             current_path.pop()
-
         if not current_new_paths_pms:
             return
-
         if not self.brute_force:
             current_new_paths_pms = sorted(current_new_paths_pms, key=lambda x: len(x[1]))
             if current_new_paths_pms:
                 cur_min_pms_len = len(current_new_paths_pms[0][1])
-
         for new_path_possible_moves in current_new_paths_pms:
             # Skip nodes with more possible outcomes than the first node in the sorted list
             if not self.brute_force and len(new_path_possible_moves[1]) > cur_min_pms_len:
                 break
-
             current_path.append(new_path_possible_moves[0])
             self.find_walks(current_path, new_path_possible_moves[1])
             current_path.pop()
@@ -310,58 +282,46 @@ class KnightsTourAlgo:
         logger.info("[Start search]".format(self.found_walks_count))
         possible_moves = []
         possible_move_min_len = 0
-
         for x_coord in range(self.board_size):
             for y_coord in range(self.board_size):
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_node, start_path)
                 possible_moves.append((start_node, pms))
-
         if not self.brute_force:
             possible_moves = sorted(possible_moves, key=lambda x: len(x[1]))
             if possible_moves:
                 possible_move_min_len = len(possible_moves[0][1])
-
         for pm in possible_moves:
             if not self.brute_force and len(possible_moves[0][1]) > possible_move_min_len:
                 break
-
             self.find_walks([pm[0]], pm[1])
 
     def find_walks_celery_task(self, current_path, possible_moves):
         current_new_paths_pms = []
-
         for possible_move in possible_moves:
             current_path.append(possible_move)
-
             if self.check_if_path_found(current_path):
                 current_path.pop()
                 continue
-
             self.find_new_pms_and_dead_ends(current_path, current_new_paths_pms)
             current_path.pop()
-
         if not current_new_paths_pms:
             return
-
         if not self.brute_force:
             current_new_paths_pms = sorted(current_new_paths_pms, key=lambda x: len(x[1]))
             if current_new_paths_pms:
                 cur_min_pms_len = len(current_new_paths_pms[0][1])
-
         for new_path_possible_moves in current_new_paths_pms:
             # Skip nodes with more possible outcomes than the first node in the sorted list
             if not self.brute_force and len(new_path_possible_moves[1]) > cur_min_pms_len:
                 break
-
             current_path.append(new_path_possible_moves[0])
 
     def bootstrap_search_celery(self):
         logger.info("[Start search with Celery Tasks]")
         possible_moves = []
         possible_move_min_len = 0
-
         for x_coord in range(self.board_size):
             for y_coord in range(self.board_size):
                 start_node = (x_coord, y_coord)
@@ -371,18 +331,14 @@ class KnightsTourAlgo:
                 self.redis_pool.sadd("possible_moves", sp, pms)
                 possible_moves.append(pms)
                 print(start_path, pms)
-
         if not self.brute_force:
             possible_moves = sorted(possible_moves, key=lambda x: len(x[1]))
             if possible_moves:
                 possible_move_min_len = len(possible_moves[0][1])
-
         for _ in possible_moves:
             if not self.brute_force and len(possible_moves[0][1]) > possible_move_min_len:
                 break
-
             # create Celery tasks
-
             # self.find_walks_celery_task([pm[0]], pm[1])
 
     def run(self):
@@ -400,17 +356,13 @@ class KnightsTourAlgo:
                                self.find_possible_moves_cached.cache_clear(),
                                self.negative_outcome_nodes_cache.cache_clear(),
                                logger.info("[Caches cleared]"))
-
         self.log_cache_info_timer.start()
         self.bootstrap_search()
         # self.bootstrap_search_celery()
         self.log_cache_info_timer.cancel()
         self.log_cache_info_timer = None
-
         tt = time.time() - self.algo_start_time
         self.print_all_walks_info()
-
         logger.info("*** ALGO TOTAL TIME: {}s ***".format(self.seconds_to_str(tt)))
         logger.info("*** ALGO END ***".format())
-
         return tt, tt / (self.found_walks_count or 1)

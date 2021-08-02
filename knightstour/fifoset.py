@@ -36,13 +36,11 @@ class FIFOSet:
     def __contains__(self, key):
         if not isinstance(key, int):
             key = int(key)
-        
         ret = key in self.__set
         if ret:
             self.__hits += 1
         else:
             self.__misses += 1
-
         return ret
 
     def __iter__(self):
@@ -68,7 +66,6 @@ class FIFOSet:
     def __evict(self, key):
         if self.__maxsize and (self.__currsize + self.getsizeof(key)) < self.__maxsize:
             return
-
         for _ in range(min(self.__evict_count, self.__currsize)):
             k = self.__set_first_added.popleft()
             self.__set.remove(k)
@@ -92,7 +89,6 @@ class FIFOSet:
             logger.debug("self.__currsize: {}".format(self.__currsize))
         except IndexError as e:
             logger.error(e)
-        
         return key
 
     @property
@@ -118,7 +114,6 @@ class FIFOSet:
     @property
     def misses(self):
         """Return the # of misses"""
-
         return self.__misses
 
     def cache_info(self):

@@ -18,10 +18,8 @@ def simple_unbound_cache(f):
         if not wrapper.cache:
             wrapper.board_size = self.board_size
             wrapper.cache = [None] * wrapper.board_size ** 2
-
         _key = key(node)
         cached = wrapper.cache[_key]
-
         if cached:
             wrapper.hits += 1
             return cached
