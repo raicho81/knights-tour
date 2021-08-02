@@ -31,7 +31,7 @@ def simple_unbound_cache(f):
 
     def cache_clear():
         init_wrapper_data()
-        logger.info("[very_simple_unbound_board_nodes_lut_cache cleared]")
+        logger.debug("very_simple_unbound_board_nodes_lut_cache cleared")
 
     def init_wrapper_data():
         wrapper.hits = 0
@@ -44,6 +44,6 @@ def simple_unbound_cache(f):
 
     # Add instrumentation to the wrapped function
     wrapper.cache_clear = cache_clear
-    wrapper.cache_info = lambda: f"Very, Very Simple Unbound Node Possible Moves Cache Info: [Cached function: {wrapper.__name__}, " \
+    wrapper.cache_info = lambda: f"Very, Very Simple Unbound Node Possible Moves Cache Info: Cached function: {wrapper.__name__}, " \
                                  f"Hits: {wrapper.hits}, Misses: {wrapper.misses}, Size: {len(wrapper.cache)}"
     return wrapper

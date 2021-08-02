@@ -9,8 +9,8 @@ def config_logging():
     log_filename += ".{0}x{0}.log".format(settings.BOARD_SIZE)
     logging.basicConfig(filename=log_filename,
                         filemode=settings.LOG_FILE_MODE,
-                        format='[%(asctime)s %(levelname)s] [%(pathname)s:%(lineno)d] [%(message)s]')
-    print("[Logging configured. Log filename is: {}]".format(log_filename))
+                        format='%(asctime)s %(pathname)s:%(lineno)d %(levelname)s: %(message)s')
+    print("Logging configured. Log filename is: {}".format(log_filename))
 
 def main():
     config_logging()
@@ -18,9 +18,9 @@ def main():
     runtimes_per_path = []
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
-    logger.info("[*** TEST START***]")
+    logger.info("*** TEST START***")
     for run_number in range(settings.N_RUNS):
-        logger.info("[*** TEST RUN # {} ***]".format(run_number + 1))
+        logger.info("*** TEST RUN # {} ***".format(run_number + 1))
         kta = KnightsTourAlgo(board_size=settings.BOARD_SIZE,
                               brute_force=settings.BRUTE_FORCE,
                               run_time_checks=settings.RUN_TIME_CHECKS,
@@ -40,11 +40,11 @@ def main():
         runtimes.append(rt)
         runtimes_per_path.append(rt_path)
     logger.info("=" * 100)
-    logger.info("[Avg. runtime after #{} runs is: {}, avg. runtime per path is: {}. ]"
+    logger.info("Avg. runtime after #{} runs is: {}, avg. runtime per path is: {}."
                  .format(len(runtimes),
                          kta.seconds_to_str(statistics.mean(runtimes)),
                          statistics.mean(runtimes_per_path)))
-    logger.info("[*** TEST END ***]")
+    logger.info("*** TEST END ***")
 
 
 if __name__ == '__main__':

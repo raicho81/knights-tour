@@ -129,4 +129,4 @@ class FIFOSet:
         self.__currsize = 0
         self.__hits = 0
         self.__misses = 0
-        logger.info("[FIFOSet cache cleared]")
+        logger.info("FIFOSet cache cleared")

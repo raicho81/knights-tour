@@ -99,4 +99,4 @@ class RedisPathsPmsHSet:
             Clear data
         """
         self.clean_redis_structures()
-        logging.info("[Redis {} cache cleared]".format(self.__class__.__name__))
+        logging.info("Redis {} cache cleared".format(self.__class__.__name__))

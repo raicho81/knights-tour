@@ -39,7 +39,7 @@ class KnightsTourAlgo:
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_password = redis_password
-        self.redis_pool = redis.Redis(host=self.redis_host,
+        self.__r = redis.Redis(host=self.redis_host,
                                       port=self.redis_port,
                                       password=self.redis_password,
                                       decode_responses=True)
@@ -47,7 +47,7 @@ class KnightsTourAlgo:
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
             evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
-            redis_pool_obj=self.redis_pool,
+            redis_pool_obj=self.__r,
             redis_set_key=redis_set_key,
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
@@ -163,7 +163,7 @@ class KnightsTourAlgo:
             pms = self.find_possible_moves(path[-1], path)
             if not pms:
                 path.append(node)
-                raise RuntimeError("[Previous node in the path doesn't have possible moves! path: {}]".format(path))
+                raise RuntimeError("Previous node in the path doesn't have possible moves! path: {}".format(path))
             if len(pms) > 1:
                 break
             self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
@@ -179,7 +179,7 @@ class KnightsTourAlgo:
 
     def check_path(self, path):
         if len(path) != self.board_size ** 2:
-            raise RuntimeError("[Invalid path length: {},  path: {}. Must be: {}]".format(len(path), path, self.board_size ** 2))
+            raise RuntimeError("Invalid path length: {},  path: {}. Must be: {}".format(len(path), path, self.board_size ** 2))
         node = path[0]
         pms = self.find_possible_moves(node, path[0:1])
         for next_node_idx in range(1, len(path)):
@@ -187,24 +187,21 @@ class KnightsTourAlgo:
             pms = self.find_possible_moves(node, path[0:next_node_idx])
             if next_node not in pms:
                 raise RuntimeError(
-                    "[Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}]"
+                    "Invalid path! There are no possible moves from the previous node to the next > path: {} > node: {} > pms: {} > next_node: {}"
                         .format(path, node, pms, next_node))
             node = next_node
         path = tuple(path)
         if path in self.generated_paths_set:
-            raise RuntimeError("[Path is already generated! path: {}, node: {}, pms: {}, next_node: {}]"
+            raise RuntimeError("Path is already generated! path: {}, node: {}, pms: {}, next_node: {}"
                                .format(path, node, pms, next_node))
         self.generated_paths_set.add(path)
 
     def log_cache_info(self, what):
         if not self.enable_cache:
             return
-        logger.info("[{} self.negative_outcome_nodes_cache Info: {}]".format(
+        logger.debug("{} self.negative_outcome_nodes_cache Info: {}".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
-        logger.info("[{} self.find_possible_moves_helper Info: {}]".format(
-            what,
-            self.find_possible_moves_cached.cache_info()))
 
     def check_if_path_found(self, new_path):
         if len(new_path) == self.board_size * self.board_size:
@@ -216,7 +213,7 @@ class KnightsTourAlgo:
                     logger.error(rte)
             else:
                 self.found_walks_count += 1
-            logger.info("[Path#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            logger.info("Path#{}:{}".format(self.found_walks_count, self.make_walk_path_string(new_path)))
             return True
         return False
 
@@ -274,11 +271,11 @@ class KnightsTourAlgo:
             current_path.pop()
 
     def print_all_walks_info(self):
-        logger.info("[# of possible walks found so far: {}]".format(self.found_walks_count))
+        logger.info("# of possible walks found so far: {}".format(self.found_walks_count))
         self.log_cache_info(what="Final")
 
     def bootstrap_search(self):
-        logger.info("[Start search]".format(self.found_walks_count))
+        logger.info("Start search")
         possible_moves = []
         possible_move_min_len = 0
         for x_coord in range(self.board_size):
@@ -318,7 +315,7 @@ class KnightsTourAlgo:
             current_path.append(new_path_possible_moves[0])
 
     def bootstrap_search_celery(self):
-        logger.info("[Start search with Celery Tasks]")
+        logger.info("Start distributed search with Celery Tasks")
         possible_moves = []
         possible_move_min_len = 0
         for x_coord in range(self.board_size):
@@ -327,7 +324,7 @@ class KnightsTourAlgo:
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_node, start_path)
                 sp = [start_path]
-                self.redis_pool.sadd("possible_moves", sp, pms)
+                self.__r.sadd("possible_moves", sp, pms)
                 possible_moves.append(pms)
                 print(start_path, pms)
         if not self.brute_force:
@@ -341,20 +338,20 @@ class KnightsTourAlgo:
             # self.find_walks_celery_task([pm[0]], pm[1])
 
     def run(self):
-        logger.info("[*** ALGO PARAMETERS START ***]")
-        logger.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
-        logger.info("[Brute force: {}]".format(self.brute_force))
-        logger.info("[Cache enabled: {}]".format(self.enable_cache))
-        logger.info("[Redis: {}]".format(self.redis_host + ":" + str(self.redis_port)))
-        logger.info("[Run time checks: {}]".format(self.run_time_checks))
-        self.enable_cache and (logger.info("[Min negative path len: {}]".format(self.min_negative_path_len)),
-                               logger.info("[Negative outcome nodes max cache size: {}]".format(
+        logger.info("*** ALGO PARAMETERS START ***")
+        logger.info("Board size: {}x{}".format(self.board_size, self.board_size))
+        logger.info("Brute force: {}".format(self.brute_force))
+        logger.info("Cache enabled: {}".format(self.enable_cache))
+        logger.info("Redis: {}".format(self.redis_host + ":" + str(self.redis_port)))
+        logger.info("Run time checks: {}".format(self.run_time_checks))
+        self.enable_cache and (logger.info("Min negative path len: {}".format(self.min_negative_path_len)),
+                               logger.info("Negative outcome nodes max cache size: {}".format(
                                    self.negative_outcome_nodes_max_cache_size)))
-        logger.info("[*** ALGO PARAMETERS END ***]")
-        self.enable_cache and (logger.info("[Clearing caches]"),
+        logger.info("*** ALGO PARAMETERS END ***")
+        self.enable_cache and (logger.info("Clearing caches"),
                                self.find_possible_moves_cached.cache_clear(),
                                self.negative_outcome_nodes_cache.cache_clear(),
-                               logger.info("[Caches cleared]"))
+                               logger.info("Caches cleared"))
         self.log_cache_info_timer.start()
         self.bootstrap_search()
         # self.bootstrap_search_celery()
