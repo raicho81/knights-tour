@@ -54,15 +54,11 @@ class RedisFIFOSet:
         return ret
 
     def __iter__(self):
-        # TODO: Do I need Transaction/Redlock here or what I need indeed? I am not sure yet.
+        # TODO: Do I need Transaction/Redlock here or what do I need indeed in this case? I am not sure yet.
         return  iter(self.__r.sscan_iter(self.__set_key))
 
     def __len__(self):
-        def trans_func_llen(p):
-            l = int(p.llen(self.__set_evict_list_key))
-            return l
-        ll = self.__r.transaction(trans_func_llen, *[self.__set_evict_list_key], value_from_callable=True)
-        return ll
+        return self.__r.transaction(lambda p: int(p.llen(self.__set_evict_list_key)), *[self.__set_evict_list_key], value_from_callable=True)
         
     def __evict(self, key):
         cursz = self.currsize

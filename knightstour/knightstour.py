@@ -119,7 +119,6 @@ class KnightsTourAlgo:
         new_node = (node[0] - 1, node[1] - 2)
         if new_node[0] >= 0 and new_node[1] >= 0:
             possible_moves.append(new_node)
-
         return possible_moves
 
     def find_possible_moves(self, node, path):
