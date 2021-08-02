@@ -79,8 +79,8 @@ class RedisFIFOSet:
     def add(self, key, is_member=None):
         if is_member is None:
             is_member = bool(self.__r.sismember(self.__set_key, key))
-        self.__evict(key)
         if not is_member:
+            self.__evict(key)
             self.__add(key)
     
     @property
