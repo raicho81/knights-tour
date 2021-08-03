@@ -10,7 +10,7 @@ from dynaconf import settings
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
-import knightstour.celery_tasks.tasks
+from celery_tasks import tasks
 import celery.exceptions
 
 logger = logging.getLogger(__name__)
@@ -136,26 +136,26 @@ class KnightsTourAlgo:
             walk_string = "{}{}{}".format(walk_string, ascii_lc[node[0]], node[1] + 1)
         return walk_string
 
-    def clear_bit(self, value, bit):
-        return value & ~(1 << bit)
+    # def clear_bit(self, value, bit):
+    #     return value & ~(1 << bit)
 
-    def set_bits(self, value, bits):
-        for bit in bits:
-            value |= (1 << bit)
-        return value
+    # def set_bits(self, value, bits):
+    #     for bit in bits:
+    #         value |= (1 << bit)
+    #     return value
 
-    def make_node_mtx_ctx(self, path):
-        """
-            Compute path's "matrix context pattern" - path nodes are encoded as single bits in a integer.
-            The position of the bits set to "1" is relative to the path nodes coordinates.
-            This represents the pattern of the given path ignoring the order of the nodes in it meaning that the reversed path will have the same
-            matrix pattern and so on. This enables fast searches of the paths already known to be with a dead end with minimum required space.
-            Keep in mind we just store some integers in a set().
-        """
-        mtx_ctx = 0
-        b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
-        mtx_ctx = self.set_bits(mtx_ctx, b)
-        return mtx_ctx
+    # def make_node_mtx_ctx(self, path):
+    #     """
+    #         Compute path's "matrix context pattern" - path nodes are encoded as single bits in a integer.
+    #         The position of the bits set to "1" is relative to the path nodes coordinates.
+    #         This represents the pattern of the given path ignoring the order of the nodes in it meaning that the reversed path will have the same
+    #         matrix pattern and so on. This enables fast searches of the paths already known to be with a dead end with minimum required space.
+    #         Keep in mind we just store some integers in a set().
+    #     """
+    #     mtx_ctx = 0
+    #     b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
+    #     mtx_ctx = self.set_bits(mtx_ctx, b)
+    #     return mtx_ctx
 
     def check_negative_node_previous_node_pms_and_cache(self, path):
         while len(path) >= self.min_negative_path_len:
@@ -175,7 +175,7 @@ class KnightsTourAlgo:
         self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add to Redis cache
 
     def compute_mtx_ctx(self, path):    # Compute in Celery
-        result = knightstour.celery_tasks.tasks.make_node_mtx_ctx.delay(path, self.board_size)
+        result = tasks.make_node_mtx_ctx.delay(path, self.board_size)
         while True:
             try:
                 mtx_ctx = result.get(timeout=1)
