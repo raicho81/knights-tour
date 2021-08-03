@@ -1,21 +1,9 @@
-from celery import Celery
-from dynaconf import settings
-
-app = Celery('tasks',
-             broker=settings.CELERY_TASKS_BROKER,
-             backend=settings.CELERY_TASKS_BACKEND,
-             accept_content=['msgpack', "json"],
-             task_compression="gzip",
-             result_compression="gzip")
-app.conf.task_serializer = 'msgpack'
-app.conf.result_serializer = 'msgpack'
-
+from .celery import app
 
 def set_bits(value, bits):
     for bit in bits:
         value |= (1 << bit)
     return value
-
 
 @app.task
 def make_node_mtx_ctx(path, board_size):

@@ -10,6 +10,7 @@
     "celery_tasks_redis_ev_list_key": "knights_tour_negative_outcomes_evict_list",
     "celery_tasks_redis_hits_key": "knights_tour_negative_outcomes_set_cache_hits",
     "celery_tasks_redis_misses_key": "knights_tour_negative_outcomes_set_cache_misses",
-    "celery_tasks_redis_paths_tasks_key": "knights_tour_redis_paths_tasks_key"
+    "celery_tasks_redis_paths_tasks_key": "knights_tour_redis_paths_tasks_key",
+    "celery_tasks_redis_paths_pms_hset_key": "knights_tour_redis_paths_pms_hset_key"
   }
 }

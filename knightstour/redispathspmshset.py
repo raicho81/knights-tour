@@ -1,6 +1,4 @@
 import logging
-from typing import Union, Any
-
 import crc16
 import redis
 import itertools
@@ -27,7 +25,6 @@ class RedisPathsPmsHSet:
         self.current_slot_local_cpy = {}
         if not self.r:
             raise ValueError("Redis connection pool object is None!")
-        self.clean_redis_structures()
 
     def clean_redis_structures(self):
         p = self.r.pipeline(transaction=True)
@@ -46,7 +43,7 @@ class RedisPathsPmsHSet:
             )
 
     def __contains__(self, key):
-        slot_n: Union[int, Any] = self.slot_n(bytes(key)) % self.cache_slots_count
+        slot_n = self.slot_n(key) % self.cache_slots_count
         if slot_n != self.current_cache_slot_n:
             self.current_cache_slot_n = slot_n
             slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, self.current_cache_slot_n)
@@ -73,7 +70,7 @@ class RedisPathsPmsHSet:
         is_key_present = key in self
         if not is_key_present:
             with self.r.pipeline(transaction=True) as p:
-                slot_n = self.slot_n(bytes(key)) % self.cache_slots_count
+                slot_n = self.slot_n(key) % self.cache_slots_count
                 slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, slot_n)
                 p.sadd(slot, key)
                 p.lpush(self.redis_path_pms__list_key, key)
@@ -99,4 +96,4 @@ class RedisPathsPmsHSet:
             Clear data
         """
         self.clean_redis_structures()
-        logging.info("Redis {} cache cleared".format(self.__class__.__name__))
+        logging.info("{} cache cleared".format(self.__class__.__name__))

@@ -169,9 +169,9 @@ class KnightsTourAlgo:
             self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
         self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
 
-    def add_to_negative_outcome_nodes_cache(self, dead_end_path):   # This is going to Celery and will be working with the Redis cache instead of local cache
+    def add_to_negative_outcome_nodes_cache(self, dead_end_path):
         mtx_ctx = self.compute_mtx_ctx(dead_end_path)   # Compute in Celery
-        self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add in Redis
+        self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add to Redis cache
 
     def compute_mtx_ctx(self, path):    # Move to Celery
         mtx_ctx = knightstour.celery_tasks.make_node_mtx_ctx(path, self.board_size)
