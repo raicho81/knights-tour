@@ -335,8 +335,7 @@ class KnightsTourAlgo:
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_path)
-                sp = [start_path]
-                self.__r.sadd("possible_moves", sp, pms)
+                self.__r.hset("possible_moves", str(start_path), str(pms))
                 possible_moves.append(pms)
                 print(start_path, pms)
         if not self.brute_force:
@@ -365,8 +364,8 @@ class KnightsTourAlgo:
                                self.negative_outcome_nodes_cache.cache_clear(),
                                logger.info("Caches cleared"))
         self.log_cache_info_timer.start()
-        self.bootstrap_search()
-        # self.bootstrap_search_celery()
+        # self.bootstrap_search()
+        self.bootstrap_search_celery()
         self.log_cache_info_timer.cancel()
         self.log_cache_info_timer = None
         tt = time.time() - self.algo_start_time

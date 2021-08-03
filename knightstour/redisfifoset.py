@@ -70,7 +70,6 @@ class RedisFIFOSet:
         for elm_to_evict in to_evict:
             self.__r.rpop(self.__set_evict_list_key)
             self.__r.srem(self.__set_key, elm_to_evict)
-            self.__contains__.pop(key)
 
     def __add(self, key):
         self.__r.sadd(self.__set_key, key)

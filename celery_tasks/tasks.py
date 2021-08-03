@@ -1,4 +1,5 @@
-from .celery import app
+from .celery import app, negative_outcome_nodes_cache
+
 
 def set_bits(value, bits):
     for bit in bits:
