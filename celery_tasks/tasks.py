@@ -22,6 +22,6 @@ def make_node_mtx_ctx(path, board_size):
 
 
 @app.task
-def run_knights_tour_task(f, *args, **kwargs):
+def run_any_function_task(f, *args, **kwargs):
     res = f(*args, **kwargs)
     return res

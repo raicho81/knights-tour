@@ -1,6 +1,5 @@
 {
   "default": {
-    "running_in_celery": false,
     "board_size": 5,
     "n_runs": 10,
     "enable_cache": true,

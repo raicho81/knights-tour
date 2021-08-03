@@ -8,6 +8,7 @@ from dynaconf import settings
 
 import redis
 from celery_tasks import tasks
+import celery.exceptions
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
@@ -175,7 +176,16 @@ class KnightsTourAlgo:
         self.negative_outcome_nodes_cache.add(mtx_ctx)
 
     def compute_mtx_ctx(self, path):
-        mtx_ctx = self.make_node_mtx_ctx(path)
+        # mtx_ctx = self.make_node_mtx_ctx(path)
+        result = tasks.make_node_mtx_ctx.delay(path, self.board_size)
+        while True:
+            try:
+                mtx_ctx = result.get(timeout=1)
+                break
+            except celery.exceptions.TimeoutError as e:
+                continue
+            except Exception as e:
+                logger.debug(e)
         return mtx_ctx
 
     def check_path(self, path):
