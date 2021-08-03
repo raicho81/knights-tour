@@ -6,7 +6,6 @@ from celery import Celery
 import redis
 
 m = imp.find_module("redisfifoset", ["knightstour"])
-# print(m)
 redisfifoset = imp.load_module("redisfifoset", *m)
 
 

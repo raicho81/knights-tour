@@ -8,7 +8,6 @@ from dynaconf import settings
 
 import redis
 from celery_tasks import tasks
-import celery.exceptions
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
