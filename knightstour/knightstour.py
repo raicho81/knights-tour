@@ -4,14 +4,15 @@ import time
 import logging
 import functools
 from threading import Timer
+from dynaconf import settings
 
 import redis
-from dynaconf import settings
+# from celery_tasks import tasks
+# import celery.exceptions
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
-from celery_tasks import tasks
-import celery.exceptions
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -122,11 +123,11 @@ class KnightsTourAlgo:
             possible_moves.append(new_node)
         return possible_moves
 
-    def find_possible_moves(self, node, path):
+    def find_possible_moves(self, path):
         if self.enable_cache:
-            return self.drop_out_moves_in_path(self.find_possible_moves_cached(node), path)
+            return self.drop_out_moves_in_path(self.find_possible_moves_cached(path[-1]), path)
         else:
-            return self.drop_out_moves_in_path(self.find_possible_moves_non_cached(node), path)
+            return self.drop_out_moves_in_path(self.find_possible_moves_non_cached(path[-1]), path)
 
     @staticmethod
     def make_walk_path_string(walk):
@@ -136,63 +137,53 @@ class KnightsTourAlgo:
             walk_string = "{}{}{}".format(walk_string, ascii_lc[node[0]], node[1] + 1)
         return walk_string
 
-    # def clear_bit(self, value, bit):
-    #     return value & ~(1 << bit)
+    def clear_bit(self, value, bit):
+        return value & ~(1 << bit)
 
-    # def set_bits(self, value, bits):
-    #     for bit in bits:
-    #         value |= (1 << bit)
-    #     return value
+    def set_bits(self, value, bits):
+        for bit in bits:
+            value |= (1 << bit)
+        return value
 
-    # def make_node_mtx_ctx(self, path):
-    #     """
-    #         Compute path's "matrix context pattern" - path nodes are encoded as single bits in a integer.
-    #         The position of the bits set to "1" is relative to the path nodes coordinates.
-    #         This represents the pattern of the given path ignoring the order of the nodes in it meaning that the reversed path will have the same
-    #         matrix pattern and so on. This enables fast searches of the paths already known to be with a dead end with minimum required space.
-    #         Keep in mind we just store some integers in a set().
-    #     """
-    #     mtx_ctx = 0
-    #     b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
-    #     mtx_ctx = self.set_bits(mtx_ctx, b)
-    #     return mtx_ctx
+    def make_node_mtx_ctx(self, path):
+        """
+            Compute path's "matrix context pattern" - path nodes are encoded as single bits in a integer.
+            The position of the bits set to "1" is relative to the path nodes coordinates.
+            This represents the pattern of the given path ignoring the order of the nodes in it meaning that the reversed path will have the same
+            matrix pattern and so on. This enables fast searches of the paths already known to be with a dead end with minimum required space.
+            Keep in mind we just store some integers in a set().
+        """
+        mtx_ctx = 0
+        b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
+        mtx_ctx = self.set_bits(mtx_ctx, b)
+        return mtx_ctx
 
     def check_negative_node_previous_node_pms_and_cache(self, path):
         while len(path) >= self.min_negative_path_len:
             node = path[-1]
             path = path[:-1]
-            pms = self.find_possible_moves(path[-1], path)
+            pms = self.find_possible_moves(path)
             if not pms:
                 path.append(node)
                 raise RuntimeError("Previous node in the path doesn't have possible moves! path: {}".format(path))
             if len(pms) > 1:
                 break
-            self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
-        self.add_to_negative_outcome_nodes_cache(path)  # Add to Redis cache
+            self.add_to_negative_outcome_nodes_cache(path)
+        self.add_to_negative_outcome_nodes_cache(path)
 
     def add_to_negative_outcome_nodes_cache(self, dead_end_path):
-        mtx_ctx = self.compute_mtx_ctx(dead_end_path)   # Compute in Celery
-        self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add to Redis cache
+        mtx_ctx = self.compute_mtx_ctx(dead_end_path)
+        self.negative_outcome_nodes_cache.add(mtx_ctx)
 
-    def compute_mtx_ctx(self, path):    # Compute in Celery
-        result = tasks.make_node_mtx_ctx.delay(path, self.board_size)
-        while True:
-            try:
-                mtx_ctx = result.get(timeout=1)
-                break
-            except celery.exceptions.TimeoutError as e:
-                logger.debug(str(e))
-            except celery.exceptions.NotRegistered as e:
-                logger.debug(result.info)
-            except Exception as e:
-                logger.debug(str(e))
+    def compute_mtx_ctx(self, path):
+        mtx_ctx = self.make_node_mtx_ctx(path)
         return mtx_ctx
 
     def check_path(self, path):
         if len(path) != self.board_size ** 2:
             raise RuntimeError("Invalid path length: {},  path: {}. Must be: {}".format(len(path), path, self.board_size ** 2))
         node = path[0]
-        pms = self.find_possible_moves(node, path[0:1])
+        pms = self.find_possible_moves(path[0:1])
         for next_node_idx in range(1, len(path)):
             next_node = path[next_node_idx]
             pms = self.find_possible_moves(node, path[0:next_node_idx])
@@ -210,7 +201,7 @@ class KnightsTourAlgo:
     def log_cache_info(self, what):
         if not self.enable_cache:
             return
-        logger.debug("{} self.negative_outcome_nodes_cache Info: {}".format(
+        logger.debug("\n{}: {}".format(
             what,
             self.negative_outcome_nodes_cache.cache_info))
 
@@ -236,7 +227,7 @@ class KnightsTourAlgo:
             :param current_new_paths_pms: All found possible moves
             (if any) for this path are added to this list
         """
-        new_pms = self.find_possible_moves(new_path[-1], new_path)
+        new_pms = self.find_possible_moves(new_path)
         if self.enable_cache and new_pms and len(new_path) >= self.min_negative_path_len:
             for new_pm_node in new_pms:
                 new_path.append(new_pm_node)
@@ -255,6 +246,7 @@ class KnightsTourAlgo:
     def find_walks(self, current_path, possible_moves):
         """
             Recursive function for exploring the graph search space.
+        
         :param current_path: current path in consideration
         :param possible_moves: possible moves list for this path
         :return:
@@ -293,7 +285,7 @@ class KnightsTourAlgo:
             for y_coord in range(self.board_size):
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
-                pms = self.find_possible_moves(start_node, start_path)
+                pms = self.find_possible_moves(start_path)
                 possible_moves.append((start_node, pms))
         if not self.brute_force:
             possible_moves = sorted(possible_moves, key=lambda x: len(x[1]))
@@ -333,7 +325,7 @@ class KnightsTourAlgo:
             for y_coord in range(self.board_size):
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
-                pms = self.find_possible_moves(start_node, start_path)
+                pms = self.find_possible_moves(start_path)
                 sp = [start_path]
                 self.__r.sadd("possible_moves", sp, pms)
                 possible_moves.append(pms)
