@@ -10,10 +10,11 @@ from dynaconf import settings
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
-import knightstour.celery_tasks
+import knightstour.celery_tasks.tasks
+import celery.exceptions
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class KnightsTourAlgo:
@@ -173,8 +174,18 @@ class KnightsTourAlgo:
         mtx_ctx = self.compute_mtx_ctx(dead_end_path)   # Compute in Celery
         self.negative_outcome_nodes_cache.add(mtx_ctx)  # Add to Redis cache
 
-    def compute_mtx_ctx(self, path):    # Move to Celery
-        mtx_ctx = knightstour.celery_tasks.make_node_mtx_ctx(path, self.board_size)
+    def compute_mtx_ctx(self, path):    # Compute in Celery
+        result = knightstour.celery_tasks.tasks.make_node_mtx_ctx.delay(path, self.board_size)
+        while True:
+            try:
+                mtx_ctx = result.get(timeout=1)
+                break
+            except celery.exceptions.TimeoutError as e:
+                logger.debug(str(e))
+            except celery.exceptions.NotRegistered as e:
+                logger.debug(result.info)
+            except Exception as e:
+                logger.debug(str(e))
         return mtx_ctx
 
     def check_path(self, path):
