@@ -12,6 +12,7 @@ import celery.exceptions
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
+from knightstour import RedisPathsPmsHSet
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class KnightsTourAlgo:
                  negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3,
                  redis_host="", redis_port=0, redis_password="", redis_set_key=settings.REDIS_SET_KEY,
                  redis_ev_list_key=settings.REDIS_EV_LIST_KEY, redis_hits_key=settings.REDIS_HITS_KEY,
-                 redis_misses_key=settings.REDIS_MISSES_KEY,
+                 redis_misses_key=settings.REDIS_MISSES_KEY, redis_path_pms_hset_key=None, redis_path_pms_list_key=None,
                  log_cache_info_timer_timeout=60):
         self.enable_cache = enable_cache
         self.board_size = board_size
@@ -45,6 +46,12 @@ class KnightsTourAlgo:
                                       port=self.redis_port,
                                       password=self.redis_password,
                                       decode_responses=True)
+        
+        self.paths_pms_hset_with_queue = RedisPathsPmsHSet(redis_path_pms_hset_key=redis_path_pms_hset_key,
+                                                           redis_path_pms_list_key=redis_path_pms_list_key,
+                                                           redis_pool_obj=self.__r)
+        
+        
         # self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
         self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
@@ -54,9 +61,13 @@ class KnightsTourAlgo:
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
             redis_misses_key=redis_misses_key)
+
         self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
         self.min_negative_path_len = min_negative_path_len
+        
+        self.running_celery_tasks = []
+
         self.log_cache_info_timer_timeout = log_cache_info_timer_timeout
         self.log_cache_info_timer = Timer(self.log_cache_info_timer_timeout, self.log_cache_info_timer_handle)
         self.log_cache_info_timer.setDaemon(True)
@@ -68,6 +79,7 @@ class KnightsTourAlgo:
         self.log_cache_info_timer.start()
 
     def init_internal_data(self):
+        self.paths_pms_hset_with_queue.clean_redis_structures()
         self.algo_start_time = time.time()
         self.generated_paths_set = set()
         self.found_walks_count = 0
@@ -176,16 +188,7 @@ class KnightsTourAlgo:
         self.negative_outcome_nodes_cache.add(mtx_ctx)
 
     def compute_mtx_ctx(self, path):
-        # mtx_ctx = self.make_node_mtx_ctx(path)
-        result = tasks.make_node_mtx_ctx.delay(path, self.board_size)
-        while True:
-            try:
-                mtx_ctx = result.get(timeout=1)
-                break
-            except celery.exceptions.TimeoutError as e:
-                continue
-            except Exception as e:
-                logger.debug(e)
+        mtx_ctx = self.make_node_mtx_ctx(path)
         return mtx_ctx
 
     def check_path(self, path):
@@ -305,48 +308,19 @@ class KnightsTourAlgo:
                 break
             self.find_walks([pm[0]], pm[1])
 
-    def find_walks_celery_task(self, current_path, possible_moves):
-        current_new_paths_pms = []
-        for possible_move in possible_moves:
-            current_path.append(possible_move)
-            if self.check_if_path_found(current_path):
-                current_path.pop()
-                continue
-            self.find_new_pms_and_dead_ends(current_path, current_new_paths_pms)
-            current_path.pop()
-        if not current_new_paths_pms:
-            return
-        if not self.brute_force:
-            current_new_paths_pms = sorted(current_new_paths_pms, key=lambda x: len(x[1]))
-            if current_new_paths_pms:
-                cur_min_pms_len = len(current_new_paths_pms[0][1])
-        for new_path_possible_moves in current_new_paths_pms:
-            # Skip nodes with more possible outcomes than the first node in the sorted list
-            if not self.brute_force and len(new_path_possible_moves[1]) > cur_min_pms_len:
-                break
-            current_path.append(new_path_possible_moves[0])
-
     def bootstrap_search_celery(self):
         logger.info("Start distributed search with Celery Tasks")
-        possible_moves = []
-        possible_move_min_len = 0
+        self.__r.delete("possible_moves_hset", "possible_moves_list")
         for x_coord in range(self.board_size):
             for y_coord in range(self.board_size):
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_path)
-                self.__r.hset("possible_moves", str(start_path), str(pms))
-                possible_moves.append(pms)
-                print(start_path, pms)
-        if not self.brute_force:
-            possible_moves = sorted(possible_moves, key=lambda x: len(x[1]))
-            if possible_moves:
-                possible_move_min_len = len(possible_moves[0][1])
-        for _ in possible_moves:
-            if not self.brute_force and len(possible_moves[0][1]) > possible_move_min_len:
-                break
-            # create Celery tasks
-            # self.find_walks_celery_task([pm[0]], pm[1])
+                self.__r.hset("possible_moves_hset", str(start_path), str(pms))
+                self.__r.lpush("possible_moves_list", str(start_path))
+        
+        # -> Start some Celery Tasks -> YEAH YEAH :)
+
 
     def run(self):
         logger.info("*** ALGO PARAMETERS START ***")
@@ -359,13 +333,13 @@ class KnightsTourAlgo:
                                logger.info("Negative outcome nodes max cache size: {}".format(
                                    self.negative_outcome_nodes_max_cache_size)))
         logger.info("*** ALGO PARAMETERS END ***")
-        self.enable_cache and (logger.info("Clearing caches"),
+        self.enable_cache and (logger.debug("Clearing caches"),
                                self.find_possible_moves_cached.cache_clear(),
                                self.negative_outcome_nodes_cache.cache_clear(),
-                               logger.info("Caches cleared"))
+                               logger.debug("Caches cleared"))
         self.log_cache_info_timer.start()
-        # self.bootstrap_search()
-        self.bootstrap_search_celery()
+        self.bootstrap_search()
+        # self.bootstrap_search_celery()
         self.log_cache_info_timer.cancel()
         self.log_cache_info_timer = None
         tt = time.time() - self.algo_start_time

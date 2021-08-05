@@ -1,7 +1,7 @@
 import logging
-import crc16
+
 import redis
-import itertools
+from pottery import RedisDeque, RedisDict, synchronize
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -10,90 +10,74 @@ logger.setLevel(logging.INFO)
 class RedisPathsPmsHSet:
     """
         Class representing a hash set with paths and their respective possible moves.
-        There is also a list with the HSet slots and keys, which is used as a new task queue
+        There is also a deque with the HSet keys, which is used as a new task queue.
     """
 
     def __init__(self, redis_path_pms_hset_key,
-                 redis_path_pms__list_key,
-                 redis_pool_obj=redis.Redis(),
-                 redis_cache_slots_count=8):
-        self.r = redis_pool_obj
-        self.redis_path_pms__list_key = redis_path_pms__list_key
+                 redis_path_pms_list_key,
+                 redis_pool_obj=redis.Redis()):
+        self.redis_path_pms__list_key = redis_path_pms_list_key
         self.redis_path_pms_hset_key = redis_path_pms_hset_key
-        self.cache_slots_count = redis_cache_slots_count
-        self.current_cache_slot_n = -1
-        self.current_slot_local_cpy = {}
-        if not self.r:
-            raise ValueError("Redis connection pool object is None!")
+        self.__r = redis_pool_obj
+        self.redis_path_pms_list = RedisDeque(redis=self.__r, key=self.redis_path_pms__list_key)
+        self.redis_path_pms_hset = RedisDict(redis=self.__r, key=self.redis_path_pms_hset_key)
+
+        # Use Redis Redlock algo for synchronization between threads and different machines etc.
+        self.add_path_pms = synchronize(key="knights_tour_add_path_pms_path_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.add_path_pms)
+        self.__iter__ = synchronize(key="knights_tour___iter___path_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.__iter__)
+        self.__len__ = synchronize(key="knights_tour___len___path_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.__len__)
+        self.__contains__ = synchronize(key="knights_tour___contains___path_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.__contains__)
+        self.clean_redis_structures = synchronize(key="knights_tour_clean_redis_structures_path_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.clean_redis_structures)
+        self.__getitem__ = synchronize(key="knights_tour___getitem___path_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.__getitem__)
 
     def clean_redis_structures(self):
-        p = self.r.pipeline(transaction=True)
-        p.delete(self.redis_path_pms__list_key)
-        for sn in range(0, self.cache_slots_count):
-            slot = "{}_slot_{}".format(self.redis_path_pms__list_key, sn)
-            p.delete(slot)
-        p.execute()
+        self.redis_path_pms_hset.clear()
+        self.redis_path_pms_list.clear()
 
     def __repr__(self):
         return "{} ({}, currsize={})".format(
-            self.__class__.__name__,
-            ["{}: {}".format(k, v) for k, v in itertools.chain(
-                *[self.r.sscan_iter("{}_slot_{}".format(self.redis_path_pms__list_key, sn)).items() for sn in range(0, self.cache_slots_count)])],
-            self.currsize
-            )
+                self.__class__.__name__,
+                ["{}: {}".format(k, v) for k, v in self.redis_path_pms_hset.items()],
+                self.currsize)
 
-    def __contains__(self, key):
-        slot_n = self.slot_n(key) % self.cache_slots_count
-        if slot_n != self.current_cache_slot_n:
-            self.current_cache_slot_n = slot_n
-            slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, self.current_cache_slot_n)
-            slot_content_iter = self.r.hscan_iter(slot)
-            self.current_slot_local_cpy = dict(slot_content_iter)
-            logger.info("Loaded cache slot: {} into self.current_slot_local_cpy".format(slot))
-
-        ret = str(key) in self.current_slot_local_cpy
+    def __contains__(self, path):
+        ret = str(path) in self.redis_path_pms_hset
         return ret
 
-    def __iter__(self):
-        return itertools.chain(*[self.r.sscan_iter("{}_slot_{}".format(self.redis_path_pms__list_key, sn)).items()
-                                 for sn in range(0, self.cache_slots_count > 0 or 1)])
-
     def __len__(self):
-        return self.r.llen(self.redis_path_pms__list_key)
+        return len(self.redis_path_pms_hset)
 
-    def slot_n(self, key):
-        crc_16 = crc16.crc16xmodem(bytes(key), 0xFFFF)
-        sn = crc_16 % self.cache_slots_count
-        return sn
+    def __iter__(self):
+        return iter(self.redis_path_pms_hset)
 
-    def add(self, key):
-        is_key_present = key in self
+    def __getitem__(self, path):
+        return self.redis_path_pms_hset[path]
+
+    def add_path_pms(self, path, pms):
+        if not isinstance(path, str) or not isinstance(pms, str):
+            raise ValueError("Invalid key and value - must be strings")
+        is_key_present = path in self
         if not is_key_present:
-            with self.r.pipeline(transaction=True) as p:
-                slot_n = self.slot_n(key) % self.cache_slots_count
-                slot = "{}_slot_{}".format(self.redis_path_pms_hset_key, slot_n)
-                p.sadd(slot, key)
-                p.lpush(self.redis_path_pms__list_key, key)
-                try:
-                    p.execute()
-                    if slot_n == self.current_cache_slot_n:
-                        self.current_slot_local_cpy.add(str(key))
-                except BrokenPipeError as e:
-                    logging.error(e)
+            self.redis_path_pms_hset[path] = pms
+            self.redis_path_pms_list.append(path)
+    
+    def pop_path_from_deque(self, eval_res_to_python_obj=True):
+        path = "[]"
+        try:
+            path = self.redis_path_pms_list.pop()
+        except IndexError as e:
+            print(e)
+        if eval_res_to_python_obj:
+            path = eval(path)
+        return path
+
+    def remove_path_from_dict(self, path, eval_res_to_python_obj=True):
+        pms = self.redis_path_pms_hset.pop(path)
+        if eval_res_to_python_obj:
+            pms = eval(pms)        
+        return pms
 
     @property
     def currsize(self):
-        """The current size of the cache."""
+        """The current size of the Hash Queue."""
         return len(self)
-
-    @staticmethod
-    def getsizeof(value):
-        """Return the size of a cache element's value."""
-        return 1
-
-    def cache_clear(self):
-        """
-            Clear data
-        """
-        self.clean_redis_structures()
-        logging.info("{} cache cleared".format(self.__class__.__name__))
