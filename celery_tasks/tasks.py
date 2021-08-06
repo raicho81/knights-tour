@@ -5,27 +5,30 @@ import math
 import redis
 from dynaconf import settings
 
-from knightstour import RedisFIFOSet
+# from knightstour import RedisFIFOSet
 from knightstour import RedisPathsPmsHSet
 
 
-__r = redis.Redis(host=settings.REDIS_HOST,
-                                port=settings.REDIS_PORT,
-                                password=settings.REDIS_PASSWORD,
-                                decode_responses=True)
+# __r = redis.Redis(host=settings.REDIS_HOST,
+#                                 port=settings.REDIS_PORT,
+#                                 password=settings.REDIS_PASSWORD,
+#                                 decode_responses=True)
 
-negative_outcome_nodes_cache = RedisFIFOSet(
-            maxsize=settings.NEG_OUTCOMES_CACHE_SIZE,
-            evict_count=math.ceil(settings.NEG_OUTCOMES_CACHE_SIZE * settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE / 100.0),
-            redis_pool_obj=__r,
-            redis_set_key=settings.REDIS_SET_KEY,
-            redis_ev_list_key=settings.REDIS_EV_LIST_KEY,
-            redis_hits_key=settings.REDIS_HITS_KEY,
-            redis_misses_key=settings.REDIS_MISSES_KEY)
+# negative_outcome_nodes_cache = RedisFIFOSet(
+#             maxsize=settings.NEG_OUTCOMES_CACHE_SIZE,
+#             evict_count=math.ceil(settings.NEG_OUTCOMES_CACHE_SIZE * settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE / 100.0),
+#             redis_pool_obj=__r,
+#             redis_set_key=settings.REDIS_SET_KEY,
+#             redis_ev_list_key=settings.REDIS_EV_LIST_KEY,
+#             redis_hits_key=settings.REDIS_HITS_KEY,
+#             redis_misses_key=settings.REDIS_MISSES_KEY)
 
 redis_paths_pms_hset_deque = RedisPathsPmsHSet(redis_path_pms_hset_key=settings.REDIS_PATHS_PMS_HSET_KEY,
-                                                 redis_path_pms_list_key=settings.REDIS_PATHS_TASKS_KEY,
-                                                 redis_pool_obj=__r)
+                                               redis_path_pms_list_key=settings.REDIS_PATHS_TASKS_KEY,
+                                               redis_pool_obj=redis.Redis(host=settings.REDIS_HOST,
+                                               port=settings.REDIS_PORT,
+                                               password=settings.REDIS_PASSWORD,
+                                               decode_responses=False))
 
 
 @lru_cache(maxsize=None)
