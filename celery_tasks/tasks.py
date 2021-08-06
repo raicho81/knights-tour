@@ -67,6 +67,10 @@ def find_possible_moves_non_cached(node, board_size=settings.BOARD_SIZE):
     return possible_moves
 
 
+def drop_out_moves_in_path(moves, path):
+    return [x for x in moves if x not in path]
+
+
 def find_possible_moves(path, enable_cache=True):
     if enable_cache:
         return drop_out_moves_in_path(find_possible_moves_cached(path[-1]), path)

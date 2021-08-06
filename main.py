@@ -25,6 +25,7 @@ def main():
         logger.info("*** TEST RUN # {} ***".format(run_number + 1))
         kta = KnightsTourAlgo(board_size=settings.BOARD_SIZE,
                               brute_force=settings.BRUTE_FORCE,
+                              distributed=settings.DISTRIBUTED,
                               run_time_checks=settings.RUN_TIME_CHECKS,
                               enable_cache=settings.ENABLE_CACHE,
                               min_negative_path_len=settings.MIN_NEG_PATH_LENGTH,

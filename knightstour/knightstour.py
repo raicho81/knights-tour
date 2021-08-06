@@ -8,10 +8,10 @@ from dynaconf import settings
 
 import redis
 from celery_tasks import tasks
-import celery.exceptions
 
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
+from knightstour import FIFOSet
 from knightstour import RedisPathsPmsHSet
 
 
@@ -26,13 +26,14 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule. Switching between them is done via the [[brute_force]] parameter.
     """
 
-    def __init__(self, board_size, brute_force=False, run_time_checks=True, enable_cache=True, min_negative_path_len=2,
+    def __init__(self, board_size, brute_force=False, distributed=False, run_time_checks=True, enable_cache=True, min_negative_path_len=2,
                  negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3,
                  redis_host="", redis_port=0, redis_password="", redis_set_key=settings.REDIS_SET_KEY,
                  redis_ev_list_key=settings.REDIS_EV_LIST_KEY, redis_hits_key=settings.REDIS_HITS_KEY,
                  redis_misses_key=settings.REDIS_MISSES_KEY, redis_path_pms_hset_key=None, redis_path_pms_list_key=None,
                  log_cache_info_timer_timeout=60):
         self.enable_cache = enable_cache
+        self.distributed = distributed
         self.board_size = board_size
         self.found_walks_count = 0
         self.brute_force = brute_force
@@ -49,11 +50,12 @@ class KnightsTourAlgo:
         
         self.paths_pms_hset_with_queue = RedisPathsPmsHSet(redis_path_pms_hset_key=redis_path_pms_hset_key,
                                                            redis_path_pms_list_key=redis_path_pms_list_key,
-                                                           redis_pool_obj=self.__r)
+                                                           redis_pool_obj=self.__r) if self.distributed else None
         
         
         # self.redis_pool.execute_command("CLIENT TRACKING ON")   # Turn on client tracking in Redis
-        self.negative_outcome_nodes_cache = RedisFIFOSet(
+        if self.distributed:
+            self.negative_outcome_nodes_cache = RedisFIFOSet(
             maxsize=self.negative_outcome_nodes_max_cache_size,
             evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0),
             redis_pool_obj=self.__r,
@@ -61,6 +63,9 @@ class KnightsTourAlgo:
             redis_ev_list_key=redis_ev_list_key,
             redis_hits_key=redis_hits_key,
             redis_misses_key=redis_misses_key)
+        else:
+            self.negative_outcome_nodes_cache = FIFOSet(maxsize=self.negative_outcome_nodes_max_cache_size,
+                                                        evict_count=math.ceil(negative_outcome_nodes_max_cache_size * percent_to_evict / 100.0))
 
         self.generated_paths_set = "knights_tour_generated_paths_set"
         self.run_time_checks = run_time_checks
@@ -79,11 +84,11 @@ class KnightsTourAlgo:
         self.log_cache_info_timer.start()
 
     def init_internal_data(self):
-        self.paths_pms_hset_with_queue.clean_redis_structures()
+        self.distributed and self.paths_pms_hset_with_queue.clean_redis_structures()
+        self.enable_cache and (self.negative_outcome_nodes_cache.clear(), self.find_possible_moves_helper.cache_clear())
         self.algo_start_time = time.time()
         self.generated_paths_set = set()
         self.found_walks_count = 0
-        self.enable_cache and (self.negative_outcome_nodes_cache.clear(), self.find_possible_moves_helper.cache_clear())
 
     def negative_outcomes_cache_size(self):
         return len(self.negative_outcome_nodes_cache)
@@ -338,8 +343,10 @@ class KnightsTourAlgo:
                                self.negative_outcome_nodes_cache.cache_clear(),
                                logger.debug("Caches cleared"))
         self.log_cache_info_timer.start()
-        self.bootstrap_search()
-        # self.bootstrap_search_celery()
+        if self.distributed:
+            self.bootstrap_search_celery()
+        else:
+            self.bootstrap_search()
         self.log_cache_info_timer.cancel()
         self.log_cache_info_timer = None
         tt = time.time() - self.algo_start_time

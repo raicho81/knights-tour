@@ -27,7 +27,7 @@ class RedisFIFOSet:
         # Sunchronize access to critical functions with Redis Redlock currently using the pottery implementation
         self.clean_redis_structures = synchronize(key='knights_tour_synchronized_clean_redis_structures', masters={self.__r}, blocking=True, timeout=1000)(self.clean_redis_structures)
         self.add = synchronize(key='knights_tour_synchronized_add', masters={self.__r}, blocking=True, timeout=1000)(self.add)
-        self.__len__ = synchronize(key='knights_tour_synchronized___len__', masters={self.__r}, blocking=True, timeout=1000)(self.__len__)
+        # self.__len__ = synchronize(key='knights_tour_synchronized___len__', masters={self.__r}, blocking=True, timeout=1000)(self.__len__)
 
     def clean_redis_structures(self):
             self.__r.delete(*[self.__set_evict_list_key, self.__set_key])
@@ -54,12 +54,12 @@ class RedisFIFOSet:
             self.add(key, is_member=ret)
         return ret
 
-    # def __iter__(self):
-    #     # TODO: Do I need Transaction/Redlock here or what do I need indeed in this case? I am not sure yet.
-    #     return  iter(self.__r.sscan_iter(self.__set_key))
+    def __iter__(self):
+        # TODO: Do I need Transaction/Redlock here or what do I need indeed in this case? I am not sure yet.
+        return  iter(self.__r.transaction(lambda p: p.sscan_iter(self.__set_key), value_from_callable=True))
 
     def __len__(self):
-        return self.__r.llen(self.__set_evict_list_key)
+        return self.__r.transaction(lambda p: p.llen(self.__set_evict_list_key), value_from_callable=True)
         
     def __evict(self, key):
         cursz = self.currsize
