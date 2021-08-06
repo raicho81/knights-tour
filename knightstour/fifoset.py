@@ -11,7 +11,7 @@ class FIFOSet:
         Class representing a set, which can be bound in size. When the maximum size is reached the first
         elements added equal to evict_count are removed to make place for new ones or if the elements are less than
         evict_count then only the available are evicted resulting in an empty set.
-        If maxsize is None the set behaves like an ordinary set().
+        If maxsize is None the set behaves like an ordinary set() and is not bound.
     """
     def __init__(self, maxsize=None, evict_count=1000):
         self.__maxsize = maxsize
@@ -20,7 +20,7 @@ class FIFOSet:
         self.__hits = 0
         self.__misses = 0
         self.__set = set()
-        self.__set_first_added = collections.deque()
+        self.__set_first_added = collections.deque() if maxsize else None
 
     def __repr__(self):
         return "{} (maxsize={}, currsize={}, hit_rate={}, hits={}, misses={}, evict_count={})".format(
@@ -50,13 +50,14 @@ class FIFOSet:
         return len(self.__set)
 
     def __sizeof__(self):
-        size = sys.getsizeof(self.__set) + sys.getsizeof(self.__set_first_added)
+        size = sys.getsizeof(self.__set) + sys.getsizeof(self.__set_first_added) if self.maxsize else 0
         return size
 
     def __delitem__(self, key):
         try:
-            index = self.__set_first_added.index(key)
-            del self.__set_first_added[index]
+            index = self.__set_first_added.index(key) if self.maxsize else None
+            if self.maxsize:
+                del self.__set_first_added[index]
             del self.__set[key]
             self.__currsize -= self.getsizeof(key)
             logger.debug("self.__currsize: {}".format(self.__currsize))
@@ -75,15 +76,17 @@ class FIFOSet:
     def add(self, key):
         self.__evict(key)
         if key not in self.__set:
-            self.__set_first_added.append(key)
+            if self.maxsize:
+                self.__set_first_added.append(key)
             self.__set.add(key)
             self.__currsize += self.getsizeof(key)
             logger.debug("self.__currsize: {}".format(self.__currsize))
 
     def pop(self, key):
         try:
-            index = self.__set_first_added.index(key)
-            self.__set_first_added.remove(index)
+            if self.maxsize:
+                index = self.__set_first_added.index(key)
+                self.__set_first_added.remove(index)
             self.__set.remove(key)
             self.__currsize -= self.getsizeof(key)
             logger.debug("self.__currsize: {}".format(self.__currsize))
@@ -124,7 +127,7 @@ class FIFOSet:
         """
             Clear FIFOSet data
         """
-        self.__set_first_added.clear()
+        self.maxsize and self.__set_first_added.clear()
         self.__set.clear()
         self.__currsize = 0
         self.__hits = 0
