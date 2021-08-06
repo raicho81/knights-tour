@@ -5,8 +5,12 @@ import imp
 from celery import Celery
 import redis
 
+
 m = imp.find_module("redisfifoset", ["knightstour"])
 redisfifoset = imp.load_module("redisfifoset", *m)
+
+m = imp.find_module("redispathspmshset", ["knightstour"])
+redispathspmshset = imp.load_module("redispathspmshset", *m)
 
 
 app = Celery('knights_tour_tasks',
@@ -16,22 +20,30 @@ app = Celery('knights_tour_tasks',
              import_from_cwd=True,
              accept_content=['msgpack', "json"])
 
+
 app.conf.task_serializer = 'msgpack'
 app.conf.result_serializer = 'msgpack'
 
-redis_pool = redis.Redis(host=settings.REDIS_HOST,
-                        port=settings.REDIS_PORT,
-                        password=settings.REDIS_PASSWORD,
-                        decode_responses=True)
 
 negative_outcome_nodes_cache = redisfifoset.RedisFIFOSet(
             maxsize=settings.NEG_OUTCOMES_CACHE_SIZE,
             evict_count=math.ceil(settings.NEG_OUTCOMES_CACHE_SIZE * settings.PERCENT_TO_EVICT_FROM_NEG_NODES_CACHE / 100.0),
-            redis_pool_obj=redis_pool,
+            redis_pool_obj=redis.Redis(host=settings.REDIS_HOST,
+                        port=settings.REDIS_PORT,
+                        password=settings.REDIS_PASSWORD,
+                        decode_responses=True),
             redis_set_key=settings.REDIS_SET_KEY,
             redis_ev_list_key=settings.REDIS_EV_LIST_KEY,
             redis_hits_key=settings.REDIS_HITS_KEY,
             redis_misses_key=settings.REDIS_MISSES_KEY)
+
+
+redis_paths_pms_hset_deque = redispathspmshset.RedisPathsPmsHSet(redis_path_pms_hset_key=settings.REDIS_PATHS_PMS_HSET_KEY,
+                                               redis_path_pms_list_key=settings.REDIS_PATHS_TASKS_KEY,
+                                               redis_pool_obj=redis.Redis(host=settings.REDIS_HOST,
+                                               port=settings.REDIS_PORT,
+                                               password=settings.REDIS_PASSWORD,
+                                               decode_responses=False))
 
 if __name__ == '__main__':
     app.start()
