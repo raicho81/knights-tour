@@ -18,7 +18,7 @@ class RedisPathsPmsDeque:
 
         self.redis_path_pms__list_key = redis_path_pms_list_key
         self.__r = redis_pool_obj
-        self.redis_path_pms_deque = RedisDeque(redis=self.__r, key=self.redis_path_pms__list_key))
+        self.redis_path_pms_deque = RedisDeque(redis=self.__r, key=self.redis_path_pms__list_key)
         # Use Redis Redlock algo for synchronization between pop and add.
         self.add_path_pms = synchronize(key="knights_tour_modify_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.add_path_pms)
         self.pop_path_pms_from_deque = synchronize(key="knights_tour_modify_pms_celery_task_synchronized", masters={self.__r}, blocking=True, timeout=1)(self.pop_path_pms_from_deque)

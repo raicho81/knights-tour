@@ -2,7 +2,8 @@ import crc16
 
 from .fifoset import FIFOSet
 from .redisfifoset import RedisFIFOSet
-from .redispathspmshset import RedisPathsPmsHSet
+from .redispathspmsdeque import RedisPathsPmsDeque
+
 from .knightstour import KnightsTourAlgo
 
 
@@ -10,7 +11,7 @@ __all__ = (
     "KnightsTourAlgo",
     "FIFOSet",
     "RedisFIFOSet",
-    "RedisPathsPmsHSet",
+    "class RedisPathsPmsDeque",
     "_crc_16",
     "slot_n",
 )

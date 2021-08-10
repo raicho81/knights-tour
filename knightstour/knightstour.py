@@ -12,7 +12,7 @@ from celery_tasks import tasks
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
 from knightstour import FIFOSet
-from knightstour import RedisPathsPmsHSet
+from knightstour import RedisPathsPmsDeque
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class KnightsTourAlgo:
                                       password=self.redis_password,
                                       decode_responses=True)
         
-        self.paths_pms_hset_with_queue = RedisPathsPmsHSet(redis_path_pms_hset_key=redis_path_pms_hset_key,
+        self.paths_pms_hset_with_queue = RedisPathsPmsDeque(redis_path_pms_hset_key=redis_path_pms_hset_key,
                                                            redis_path_pms_list_key=redis_path_pms_list_key,
                                                            redis_pool_obj=self.__r) if self.distributed else None
         
