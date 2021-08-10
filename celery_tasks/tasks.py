@@ -1,4 +1,4 @@
-from .celery import app, negative_outcome_nodes_cache, redis_paths_pms_hset_deque
+from .celery import app, negative_outcome_nodes_cache, redis_paths_pms_struct
 from functools import lru_cache
 
 # import redis
@@ -134,8 +134,8 @@ def find_new_pms_and_dead_ends(new_path, current_new_paths_pms):
 def find_walks_celery_task():
     found_paths = []
     while True:
-        current_path = redis_paths_pms_hset_deque.pop_path_from_deque()
-        possible_moves = redis_paths_pms_hset_deque[str(current_path)] if current_path else []
+        current_path = redis_paths_pms_struct.pop_path_from_deque()
+        possible_moves = redis_paths_pms_struct[str(current_path)] if current_path else []
         for possible_move in possible_moves:
             current_path.append(possible_move)
             if check_if_path_found(current_path):
@@ -145,7 +145,7 @@ def find_walks_celery_task():
             find_new_pms_and_dead_ends(current_path, current_new_paths_pms)
             current_path.pop()
         if not current_new_paths_pms:
-            redis_paths_pms_hset_deque.remove_path_from_dict(str(current_path))
+            redis_paths_pms_struct.remove_path_from_dict(str(current_path))
             return
         if not settings.BRUTE_FORCE:
             # Skip nodes with more possible outcomes than the first node in the sorted list if brute_forse is OFF
@@ -157,7 +157,7 @@ def find_walks_celery_task():
             if not settings.BRUTE_FORCE and len(new_path_possible_moves[1]) > cur_min_pms_len:
                 break
             current_path.append(new_path_possible_moves[0])
-            redis_paths_pms_hset_deque.add_path_pms(current_path, new_path_possible_moves[1])
+            redis_paths_pms_struct.add_path_pms(current_path, new_path_possible_moves[1])
             current_path.pop()
         if found_paths:
             return found_paths

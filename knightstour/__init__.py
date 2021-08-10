@@ -2,7 +2,7 @@ import crc16
 
 from .fifoset import FIFOSet
 from .redisfifoset import RedisFIFOSet
-from .redispathspmsdeque import RedisPathsPmsDeque
+from .redispathspmsdeque import RedisPathsPmsStruct
 
 from .knightstour import KnightsTourAlgo
 
