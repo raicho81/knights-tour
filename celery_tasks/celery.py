@@ -9,8 +9,8 @@ import redis
 m = imp.find_module("redisfifoset", ["knightstour"])
 redisfifoset = imp.load_module("redisfifoset", *m)
 
-m = imp.find_module("redispathspmsdeque", ["knightstour"])
-redispathspmsdeque = imp.load_module("redispathspmsdeque", *m)
+m = imp.find_module("redispathspmsstruct", ["knightstour"])
+redispathspmsstruct = imp.load_module("redispathspmsstruct", *m)
 
 
 app = Celery('knights_tour_tasks',
@@ -38,7 +38,7 @@ negative_outcome_nodes_cache = redisfifoset.RedisFIFOSet(
             redis_misses_key=settings.REDIS_MISSES_KEY)
 
 
-redis_paths_pms_hset_deque = redispathspmsdeque.RedisPathsPmsDeque(
+redis_paths_pms_struct = redispathspmsstruct.RedisPathsPmsStruct(
                                                redis_path_pms_list_key=settings.REDIS_PATHS_TASKS_KEY,
                                                redis_pool_obj=redis.Redis(host=settings.REDIS_HOST,
                                                port=settings.REDIS_PORT,

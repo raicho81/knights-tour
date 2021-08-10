@@ -17,6 +17,7 @@ class RedisFIFOSet:
                 redis_ev_list_key=None,
                 redis_hits_key=None,
                 redis_misses_key=None):
+
         self.__hits_key = redis_hits_key
         self.__misses_key = redis_misses_key
         self.__maxsize = maxsize
@@ -24,10 +25,10 @@ class RedisFIFOSet:
         self.__set_key = redis_set_key
         self.__set_evict_list_key = redis_ev_list_key
         self.__r = redis_pool_obj
+
         # Sunchronize access to critical functions with Redis Redlock currently using the pottery implementation
         self.clean_redis_structures = synchronize(key='knights_tour_synchronized_clean_redis_structures', masters={self.__r}, blocking=True, timeout=1000)(self.clean_redis_structures)
         self.add = synchronize(key='knights_tour_synchronized_add', masters={self.__r}, blocking=True, timeout=1000)(self.add)
-        # self.__len__ = synchronize(key='knights_tour_synchronized___len__', masters={self.__r}, blocking=True, timeout=1000)(self.__len__)
 
     def clean_redis_structures(self):
             self.__r.delete(*[self.__set_evict_list_key, self.__set_key])
@@ -54,9 +55,9 @@ class RedisFIFOSet:
             self.add(key, is_member=ret)
         return ret
 
-    def __iter__(self):
-        # TODO: Do I need Transaction/Redlock here or what do I need indeed in this case? I am not sure yet.
-        return  iter(self.__r.transaction(lambda p: p.sscan_iter(self.__set_key), value_from_callable=True))
+    # def __iter__(self):
+    #     # TODO: Do I need Transaction/Redlock here or what do I need indeed in this case? I am not sure yet.
+    #     return  iter(self.__r.transaction(lambda p: p.sscan_iter(self.__set_key), value_from_callable=True))
 
     def __len__(self):
         return self.__r.transaction(lambda p: p.llen(self.__set_evict_list_key), value_from_callable=True)
@@ -66,11 +67,9 @@ class RedisFIFOSet:
         if self.__maxsize and (cursz + self.getsizeof(key)) <= self.__maxsize:
             return
         how_much_to_evict = min(self.__evict_count, cursz)
-        llen = self.__r.llen(self.__set_evict_list_key)
-        to_evict = self.__r.lrange(self.__set_evict_list_key, llen - how_much_to_evict, llen)
-        for elm_to_evict in to_evict:
-            self.__r.rpop(self.__set_evict_list_key)
-            self.__r.srem(self.__set_key, elm_to_evict)
+        to_evict = self.__r.lrange(self.__set_evict_list_key, self.__maxsize - how_much_to_evict, self.__maxsize)
+        self.__r.rpop(self.__set_evict_list_key, how_much_to_evict)
+        self.__r.srem(self.__set_key, [elm_to_evict for elm_to_evict in to_evict])
 
     def __add(self, key):
         self.__r.sadd(self.__set_key, key)

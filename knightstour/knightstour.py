@@ -12,7 +12,7 @@ from celery_tasks import tasks
 from .simpleunboundcache import simple_unbound_cache
 from knightstour import RedisFIFOSet
 from knightstour import FIFOSet
-from knightstour import RedisPathsPmsDeque
+from knightstour import RedisPathsPmsStruct
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ class KnightsTourAlgo:
                                       password=self.redis_password,
                                       decode_responses=True)
         
-        self.paths_pms_hset_with_queue = RedisPathsPmsDeque(redis_path_pms_hset_key=redis_path_pms_hset_key,
+        self.paths_pms_struct = RedisPathsPmsStruct(redis_path_pms_hset_key=redis_path_pms_hset_key,
                                                            redis_path_pms_list_key=redis_path_pms_list_key,
                                                            redis_pool_obj=self.__r) if self.distributed else None
         
@@ -84,7 +84,7 @@ class KnightsTourAlgo:
         self.log_cache_info_timer.start()
 
     def init_internal_data(self):
-        self.distributed and self.paths_pms_hset_with_queue.clean_redis_structures()
+        self.distributed and self.paths_pms_struct.clean_redis_structures()
         self.enable_cache and (self.negative_outcome_nodes_cache.clear(), self.find_possible_moves_helper.cache_clear())
         self.algo_start_time = time.time()
         self.generated_paths_set = set()
@@ -315,7 +315,7 @@ class KnightsTourAlgo:
 
     def bootstrap_search_celery(self):
         logger.info("Start distributed search with Celery Tasks")
-        self.__r.delete("possible_moves_hset", "possible_moves_list")
+        self.paths_pms_struct.clear_redis_structures()
         for x_coord in range(self.board_size):
             for y_coord in range(self.board_size):
                 start_node = (x_coord, y_coord)
