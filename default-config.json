@@ -1,6 +1,7 @@
 {
-  "board_size": 5,
-  "n_runs": 10,
+  "board_size_x": 5,
+  "board_size_y": 6,
+  "n_runs": 1,
   "cache": true,
   "neg_outcomes_cache_size": 50000000,
   "percent_to_evict_from_neg_nodes_cache": 5,
@@ -8,5 +9,5 @@
   "run_time_checks": false,
   "brute_force": true,
   "log_filename": null,
-  "log_file_mode": "a+"
+  "log_file_mode": "w+"
 }

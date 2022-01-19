@@ -15,9 +15,10 @@ class KnightsTourAlgo:
         https://en.wikipedia.org/wiki/Knight%27s_tour#Warnsdorff's_rule. Switching between them is done via the [[brute_force]] parameter.
     """
 
-    def __init__(self, board_size, brute_force=False, run_time_checks=True, min_negative_path_len=2,
+    def __init__(self, board_size_x, board_size_y, brute_force=False, run_time_checks=True, min_negative_path_len=2,
                  negative_outcome_nodes_max_cache_size=10 * 1000 * 1000, percent_to_evict=3):
-        self.board_size = board_size
+        self.board_size_x = board_size_x
+        self.board_size_y = board_size_y
         self.found_walks_count = 0
         self.brute_force = brute_force
         self.algo_start_time = time.time()
@@ -59,23 +60,23 @@ class KnightsTourAlgo:
         # for which I am using a set for faster search in the current path.
 
         new_node = (node[0] + 1, node[1] + 2)
-        if new_node[0] < self.board_size and new_node[1] < self.board_size:
+        if new_node[0] < self.board_size_x and new_node[1] < self.board_size_y:
             possible_moves.append(new_node)
 
         new_node = (node[0] + 1, node[1] - 2)
-        if new_node[0] < self.board_size and new_node[1] >= 0:
+        if new_node[0] < self.board_size_x and new_node[1] >= 0:
             possible_moves.append(new_node)
 
         new_node = (node[0] + 2, node[1] + 1)
-        if new_node[0] < self.board_size and new_node[1] < self.board_size:
+        if new_node[0] < self.board_size_x and new_node[1] < self.board_size_y:
             possible_moves.append(new_node)
 
         new_node = (node[0] + 2, node[1] - 1)
-        if new_node[0] < self.board_size and new_node[1] >= 0:
+        if new_node[0] < self.board_size_x and new_node[1] >= 0:
             possible_moves.append(new_node)
 
         new_node = (node[0] - 2, node[1] + 1)
-        if new_node[0] >= 0 and new_node[1] < self.board_size:
+        if new_node[0] >= 0 and new_node[1] < self.board_size_y:
             possible_moves.append(new_node)
 
         new_node = (node[0] - 2, node[1] - 1)
@@ -83,7 +84,7 @@ class KnightsTourAlgo:
             possible_moves.append(new_node)
 
         new_node = (node[0] - 1, node[1] + 2)
-        if new_node[0] >= 0 and new_node[1] < self.board_size:
+        if new_node[0] >= 0 and new_node[1] < self.board_size_y:
             possible_moves.append(new_node)
 
         new_node = (node[0] - 1, node[1] - 2)
@@ -120,7 +121,7 @@ class KnightsTourAlgo:
             Keep in mind we just store some integers in a set().
         """
         mtx_ctx = 0
-        b = [(path_node[1] * self.board_size + path_node[0]) for path_node in path]
+        b = [(path_node[1] * self.board_size_x + path_node[0]) for path_node in path]
         mtx_ctx = self.set_bits(mtx_ctx, b)
         return mtx_ctx
 
@@ -149,8 +150,8 @@ class KnightsTourAlgo:
         return mtx_ctx
 
     def check_path(self, path):
-        if len(path) != self.board_size ** 2:
-            raise RuntimeError("[Invalid path length: {},  path: {}. Must be: {}]".format(len(path), path, self.board_size ** 2))
+        if len(path) != self.board_size_x * self.board_size_y:
+            raise RuntimeError("[Invalid path length: {},  path: {}. Must be: {}]".format(len(path), path, self.board_size_x * self.board_size_y))
         node = path[0]
         pms = self.find_possible_moves(node, path[0:1])
         for next_node_idx in range(1, len(path)):
@@ -175,7 +176,7 @@ class KnightsTourAlgo:
             self.find_possible_moves_helper.cache_info()))
 
     def check_if_path_found(self, new_path):
-        if len(new_path) == self.board_size * self.board_size:
+        if len(new_path) == self.board_size_x * self.board_size_y:
             if self.run_time_checks:
                 try:
                     self.check_path(new_path)
@@ -197,22 +198,23 @@ class KnightsTourAlgo:
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
         new_pms = self.find_possible_moves(new_path[-1], new_path)
 
-        # Filter negative outcome paths
-        if new_pms and len(new_path) >= self.min_negative_path_len:
-            for new_pm_node in new_pms:
-                new_path.append(new_pm_node)
-                mtx_ctx = self.compute_mtx_ctx(new_path)
+        # # Filter negative outcome paths
+        # if new_pms and len(new_path) >= self.min_negative_path_len:
+        #     for new_pm_node in new_pms:
+        #         new_path.append(new_pm_node)
+        #         mtx_ctx = self.compute_mtx_ctx(new_path)
 
-                if mtx_ctx in self.negative_outcome_nodes_cache:
-                    new_pms.remove(new_pm_node)     # It really beats me why this is working correctly. Try changing it to something else ... Like saving the values you have to
-                    # remove and remove them later and observe the results.
+        #         if mtx_ctx in self.negative_outcome_nodes_cache:
+        #             new_pms.remove(new_pm_node)     # It really beats me why this is working correctly. Try changing it to something else ... Like saving the values you have to
+        #             # remove and remove them later and observe the results.
 
-                new_path.pop()
+        #         new_path.pop()
 
         if new_pms:
             current_new_paths_pms.append((new_path[-1], new_pms))
         else:
-            self.check_negative_node_previous_node_pms_and_cache(new_path)
+            pass
+            # self.check_negative_node_previous_node_pms_and_cache(new_path)
 
     def find_walks(self, current_path, possible_moves):
         current_new_paths_pms = []
@@ -252,8 +254,8 @@ class KnightsTourAlgo:
         logging.info("[Start search]".format(self.found_walks_count))
         possible_moves = []
 
-        for x_coord in range(self.board_size):
-            for y_coord in range(self.board_size):
+        for x_coord in range(self.board_size_x):
+            for y_coord in range(self.board_size_y):
                 start_node = (x_coord, y_coord)
                 start_path = [start_node]
                 pms = self.find_possible_moves(start_node, start_path)
@@ -272,7 +274,7 @@ class KnightsTourAlgo:
 
     def run(self):
         logging.info("[*** ALGO PARAMETERS START ***]")
-        logging.info("[Board size: {}x{}]".format(self.board_size, self.board_size))
+        logging.info("[Board size: {}x{}]".format(self.board_size_x, self.board_size_y))
         logging.info("[Brute force: {}]".format(self.brute_force))
         logging.info("[Run time checks: {}]".format(self.run_time_checks))
         logging.info("[Min negative path len: {}]".format(self.min_negative_path_len))

@@ -9,13 +9,14 @@ def simple_unbound_cache(f):
         No need to pre-build LUT tables as this can be computed in constant time (board_size ** 2, provided that board_size is a small constant)
     """
     def key(node):
-        return (node[1] * wrapper.board_size + node[0]) % wrapper.board_size ** 2
+        return (node[1] * wrapper.board_size_x + node[0])
 
     @functools.wraps(f)
     def wrapper(self, node):
         if not wrapper.cache:
-            wrapper.board_size = self.board_size
-            wrapper.cache = [None] * wrapper.board_size ** 2
+            wrapper.board_size_x = self.board_size_x
+            wrapper.board_size_y = self.board_size_y
+            wrapper.cache = [None] * (wrapper.board_size_x * wrapper.board_size_y)
 
         _key = key(node)
         cached = wrapper.cache[_key]
@@ -36,8 +37,9 @@ def simple_unbound_cache(f):
     def init_wrapper_data():
         wrapper.hits = 0
         wrapper.misses = 0
-        wrapper.board_size = 0
-        wrapper.cache = [None] * wrapper.board_size ** 2
+        wrapper.board_size_x = 0
+        wrapper.board_size_y = 0
+        wrapper.cache = [None] * (wrapper.board_size_x * wrapper.board_size_y)
 
     # Init the wrapper internal data
     init_wrapper_data()
