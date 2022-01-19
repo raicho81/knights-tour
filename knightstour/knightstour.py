@@ -189,7 +189,7 @@ class KnightsTourAlgo:
             if self.found_walks_count and self.found_walks_count % 100 == 0:
                 self.print_info(what="Current")
 
-            logging.info("[#{}:{}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
+            logging.info("[Path#{}: {}]".format(self.found_walks_count, self.make_walk_path_string(new_path)))
 
             return True
 
@@ -198,23 +198,22 @@ class KnightsTourAlgo:
     def find_new_pms_and_dead_ends(self, new_path, current_new_paths_pms):
         new_pms = self.find_possible_moves(new_path[-1], new_path)
 
-        # # Filter negative outcome paths
-        # if new_pms and len(new_path) >= self.min_negative_path_len:
-        #     for new_pm_node in new_pms:
-        #         new_path.append(new_pm_node)
-        #         mtx_ctx = self.compute_mtx_ctx(new_path)
+        # Filter negative outcome paths
+        if new_pms and len(new_path) >= self.min_negative_path_len:
+            for new_pm_node in new_pms:
+                new_path.append(new_pm_node)
+                mtx_ctx = self.compute_mtx_ctx(new_path)
 
-        #         if mtx_ctx in self.negative_outcome_nodes_cache:
-        #             new_pms.remove(new_pm_node)     # It really beats me why this is working correctly. Try changing it to something else ... Like saving the values you have to
-        #             # remove and remove them later and observe the results.
+                if mtx_ctx in self.negative_outcome_nodes_cache:
+                    new_pms.remove(new_pm_node)     # It really beats me why this is working correctly. Try changing it to something else ... Like saving the values you have to
+                    # remove and remove them later and observe the results.
 
-        #         new_path.pop()
+                new_path.pop()
 
         if new_pms:
             current_new_paths_pms.append((new_path[-1], new_pms))
         else:
-            pass
-            # self.check_negative_node_previous_node_pms_and_cache(new_path)
+            self.check_negative_node_previous_node_pms_and_cache(new_path)
 
     def find_walks(self, current_path, possible_moves):
         current_new_paths_pms = []

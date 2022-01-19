@@ -6,8 +6,8 @@
   "neg_outcomes_cache_size": 50000000,
   "percent_to_evict_from_neg_nodes_cache": 5,
   "min_neg_path_length": 2,
-  "run_time_checks": false,
+  "run_time_checks": true,
   "brute_force": true,
   "log_filename": null,
-  "log_file_mode": "w+"
+  "log_file_mode": "a+"
 }
