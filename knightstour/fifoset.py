@@ -36,7 +36,6 @@ class FIFOSet:
             self.__hits += 1
         else:
             self.__misses += 1
-
         return ret
 
     def __iter__(self):
@@ -55,7 +54,6 @@ class FIFOSet:
                 k = self.__set_first_added.popleft()
                 self.__set.remove(k)
                 self.__currsize -= self.getsizeof(key)
-
         if key not in self.__set:
             self.__set_first_added.append(key)
             self.__set.add(key)

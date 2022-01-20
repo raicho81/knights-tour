@@ -1,9 +1,9 @@
 {
-  "board_size_x": 5,
-  "board_size_y": 6,
+  "board_size_x": 7,
+  "board_size_y": 7,
   "n_runs": 1,
   "cache": true,
-  "neg_outcomes_cache_size": 50000000,
+  "neg_outcomes_cache_size": 20000000,
   "percent_to_evict_from_neg_nodes_cache": 5,
   "min_neg_path_length": 2,
   "run_time_checks": false,

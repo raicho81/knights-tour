@@ -6,7 +6,7 @@ def simple_unbound_cache(f):
     """
         Very simple (and hopefully very fast) unbound cache of the nodes possible moves.
         Realised as a simple list with a very simple hash function to map the input (node) to the output list (moves)  with a <=> (equivalence) relation.
-        No need to pre-build LUT tables as this can be computed in constant time (board_size ** 2, provided that board_size is a small constant)
+        No need to pre-build LUT tables as this can be computed in constant time (board_size_x * board_size_y, provided that board_size is a small constant)
     """
     def key(node):
         return (node[1] * wrapper.board_size_x + node[0])
@@ -17,10 +17,8 @@ def simple_unbound_cache(f):
             wrapper.board_size_x = self.board_size_x
             wrapper.board_size_y = self.board_size_y
             wrapper.cache = [None] * (wrapper.board_size_x * wrapper.board_size_y)
-
         _key = key(node)
         cached = wrapper.cache[_key]
-
         if cached:
             wrapper.hits += 1
             return cached
@@ -43,9 +41,8 @@ def simple_unbound_cache(f):
 
     # Init the wrapper internal data
     init_wrapper_data()
-
     # Add instrumentation to the wrapped function
     wrapper.cache_clear = cache_clear
     wrapper.cache_info = lambda: f"Very, Very Simple Unbound Node Possible Moves Cache Info: [Cached function: {wrapper.__name__}, " \
-                                 f"Hits: {wrapper.hits}, Misses: {wrapper.misses}, Size: {len(wrapper.cache)}"
+                                 f"Hits %: {wrapper.hits * 100 / (wrapper.hits + wrapper.misses)}, Hits: {wrapper.hits}, Misses: {wrapper.misses}, Size: {len(wrapper.cache)}"
     return wrapper
